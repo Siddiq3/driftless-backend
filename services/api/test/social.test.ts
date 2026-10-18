@@ -1,0 +1,291 @@
+import { randomUUID } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
+import { v1 } from '@siddiq3/driftless-contracts';
+import { addDays, localDateOf } from '@siddiq3/driftless-contracts/domain';
+import { scoreMember } from '../src/modules/challenges.js';
+import { route } from '../src/router.js';
+import { bodyOf, event, newSub } from './helpers.js';
+
+const call = (method: string, path: string, sub: string, body?: unknown) =>
+  route(event({ method, path, sub, body }));
+const today = localDateOf(Date.now(), 'UTC');
+
+let n = 0;
+/** A signed-up user with a handle; optionally sharing with friends. */
+async function user(share = true): Promise<{ sub: string; handle: string }> {
+  const sub = newSub();
+  const handle = `u${Date.now().toString(36)}${(n++).toString(36)}`.slice(0, 20);
+  await call('GET', '/v1/me', sub);
+  const r = await route(
+    event({
+      method: 'PATCH',
+      path: '/v1/me',
+      sub,
+      body: { handle, consent: { cloudSync: true, shareWithFriends: share } },
+      headers: { 'if-match': '1' },
+    }),
+  );
+  expect(r.statusCode).toBe(200);
+  return { sub, handle };
+}
+
+async function befriend(a: { sub: string }, b: { sub: string; handle: string }) {
+  expect((await call('POST', '/v1/friends/requests', a.sub, { handle: b.handle })).statusCode).toBe(
+    200,
+  );
+  expect(
+    (await call('POST', '/v1/friends/respond', b.sub, { userId: a.sub, accept: true })).statusCode,
+  ).toBe(200);
+}
+
+const friends = async (sub: string) =>
+  v1.FriendsResponse.parse(bodyOf(await call('GET', '/v1/friends', sub))).friends;
+
+describe('friends', () => {
+  it('request by handle → pending both ways → accept → friends', async () => {
+    const a = await user();
+    const b = await user();
+    const r = await call('POST', '/v1/friends/requests', a.sub, { handle: b.handle });
+    expect(v1.FriendRequestResult.parse(bodyOf(r)).friend.status).toBe('pending_out');
+    expect((await friends(b.sub))[0]).toMatchObject({ userId: a.sub, status: 'pending_in' });
+    await call('POST', '/v1/friends/respond', b.sub, { userId: a.sub, accept: true });
+    expect((await friends(a.sub))[0]).toMatchObject({
+      userId: b.sub,
+      status: 'accepted',
+      handle: b.handle,
+    });
+  });
+
+  it('an invite code connects instantly', async () => {
+    const a = await user();
+    const b = await user();
+    const inv = v1.InviteResponse.parse(bodyOf(await call('POST', '/v1/friends/invites', a.sub)));
+    expect(inv.code).toMatch(/^[A-HJ-NP-Z2-9]{10}$/);
+    const r = await call('POST', '/v1/friends/requests', b.sub, { inviteCode: inv.code });
+    expect(v1.FriendRequestResult.parse(bodyOf(r)).friend.status).toBe('accepted');
+    expect((await friends(a.sub))[0]!.status).toBe('accepted');
+  });
+
+  it('mutual requests become friends', async () => {
+    const a = await user();
+    const b = await user();
+    await call('POST', '/v1/friends/requests', a.sub, { handle: b.handle });
+    const r = await call('POST', '/v1/friends/requests', b.sub, { handle: a.handle });
+    expect(v1.FriendRequestResult.parse(bodyOf(r)).friend.status).toBe('accepted');
+  });
+
+  it('guards: self, unknown handle, no own handle, duplicates, bad invite', async () => {
+    const a = await user();
+    const b = await user();
+    expect(
+      (await call('POST', '/v1/friends/requests', a.sub, { handle: a.handle })).statusCode,
+    ).toBe(400);
+    expect(
+      (await call('POST', '/v1/friends/requests', a.sub, { handle: 'nobody_here_zz' })).statusCode,
+    ).toBe(404);
+    const noHandle = newSub();
+    await call('GET', '/v1/me', noHandle);
+    expect(
+      bodyOf(await call('POST', '/v1/friends/requests', noHandle, { handle: b.handle })).code,
+    ).toBe('handle_required');
+    await call('POST', '/v1/friends/requests', a.sub, { handle: b.handle });
+    expect(
+      bodyOf(await call('POST', '/v1/friends/requests', a.sub, { handle: b.handle })).code,
+    ).toBe('request_pending');
+    expect(
+      (await call('POST', '/v1/friends/requests', a.sub, { inviteCode: 'ABCDEFGHJK' })).statusCode,
+    ).toBe(404);
+  });
+
+  it('decline and remove delete both sides; you cannot accept your own request', async () => {
+    const a = await user();
+    const b = await user();
+    await call('POST', '/v1/friends/requests', a.sub, { handle: b.handle });
+    expect(
+      (await call('POST', '/v1/friends/respond', a.sub, { userId: b.sub, accept: true }))
+        .statusCode,
+    ).toBe(404);
+    await call('POST', '/v1/friends/respond', b.sub, { userId: a.sub, accept: false });
+    expect(await friends(a.sub)).toEqual([]);
+    await befriend(a, b);
+    await call('POST', '/v1/friends/remove', b.sub, { userId: a.sub });
+    expect(await friends(a.sub)).toEqual([]);
+    expect(await friends(b.sub)).toEqual([]);
+  });
+
+  it('friend requests are rate limited (20/hour)', async () => {
+    const a = await user();
+    for (let i = 0; i < 20; i++)
+      await call('POST', '/v1/friends/requests', a.sub, { handle: `missing_${i}_xx` });
+    const r = await call('POST', '/v1/friends/requests', a.sub, { handle: 'missing_last_xx' });
+    expect(r.statusCode).toBe(429);
+    expect(r.headers?.['retry-after']).toBe('3600');
+  });
+});
+
+async function syncDays(sub: string, minutesByOffset: Record<number, number>) {
+  const days = Object.entries(minutesByOffset).map(([off, minutes]) => ({
+    localDate: addDays(today, Number(off)),
+    tz: 'UTC',
+    platform: 'android' as const,
+    deviceId: randomUUID(),
+    views: null,
+    adViews: null,
+    minutes,
+    coverage: 1,
+    rev: 1,
+  }));
+  const r = await route(
+    event({
+      method: 'POST',
+      path: '/v1/usage/sync',
+      sub,
+      body: { days },
+      headers: { 'idempotency-key': randomUUID() },
+    }),
+  );
+  expect(r.statusCode).toBe(200);
+}
+
+const create = async (sub: string, over: Record<string, unknown> = {}) =>
+  call('POST', '/v1/challenges', sub, {
+    title: 'Calm week',
+    metric: 'fewest_minutes',
+    startDate: addDays(today, -2),
+    endDate: addDays(today, 4),
+    tz: 'UTC',
+    maxMembers: 3,
+    ...over,
+  });
+
+describe('challenges & leaderboards', () => {
+  it('friends join; strangers cannot; full challenges refuse', async () => {
+    const a = await user();
+    const b = await user();
+    const c = await user();
+    const d = await user();
+    await befriend(a, b);
+    await befriend(a, d);
+    const ch = v1.ChallengeSummary.parse(bodyOf(await create(a.sub, { maxMembers: 2 })));
+    expect((await call('POST', `/v1/challenges/${ch.challengeId}/join`, c.sub)).statusCode).toBe(
+      404,
+    ); // not a friend
+    expect(
+      v1.ChallengeSummary.parse(
+        bodyOf(await call('POST', `/v1/challenges/${ch.challengeId}/join`, b.sub)),
+      ).memberCount,
+    ).toBe(2);
+    expect(bodyOf(await call('POST', `/v1/challenges/${ch.challengeId}/join`, d.sub)).code).toBe(
+      'challenge_full',
+    );
+    const mine = v1.ChallengesResponse.parse(
+      bodyOf(await call('GET', '/v1/challenges', b.sub)),
+    ).challenges;
+    expect(mine.map((x) => x.challengeId)).toEqual([ch.challengeId]);
+  });
+
+  it('ranks only members who share; others are counted as hidden; non-members see nothing', async () => {
+    const a = await user();
+    const b = await user();
+    const shy = await user(false);
+    const outsider = await user();
+    await befriend(a, b);
+    await befriend(a, shy);
+    const ch = v1.ChallengeSummary.parse(bodyOf(await create(a.sub)));
+    await call('POST', `/v1/challenges/${ch.challengeId}/join`, b.sub);
+    await call('POST', `/v1/challenges/${ch.challengeId}/join`, shy.sub);
+    await syncDays(a.sub, { [-2]: 40, [-1]: 20 }); // avg 30
+    await syncDays(b.sub, { [-1]: 10, 0: 20 }); // avg 15
+    await syncDays(shy.sub, { [-1]: 1 });
+    const lb = v1.LeaderboardResponse.parse(
+      bodyOf(await call('GET', `/v1/challenges/${ch.challengeId}/leaderboard`, a.sub)),
+    );
+    expect(lb.entries.map((e) => [e.rank, e.handle, e.score])).toEqual([
+      [1, b.handle, 15],
+      [2, a.handle, 30],
+    ]);
+    expect(lb.hiddenMembers).toBe(1);
+    expect(lb.entries.some((e) => e.userId === shy.sub)).toBe(false);
+    expect(
+      (await call('GET', `/v1/challenges/${ch.challengeId}/leaderboard`, outsider.sub)).statusCode,
+    ).toBe(404);
+  });
+
+  it('validates dates and length', async () => {
+    const a = await user();
+    expect(
+      (await create(a.sub, { startDate: addDays(today, -10), endDate: addDays(today, 1) }))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      (await create(a.sub, { startDate: today, endDate: addDays(today, 40) })).statusCode,
+    ).toBe(400);
+    expect((await call('POST', '/v1/challenges/not-a-uuid/join', a.sub)).statusCode).toBe(404);
+  });
+
+  it('leaving frees a place', async () => {
+    const a = await user();
+    const b = await user();
+    await befriend(a, b);
+    const ch = v1.ChallengeSummary.parse(bodyOf(await create(a.sub, { maxMembers: 2 })));
+    await call('POST', `/v1/challenges/${ch.challengeId}/join`, b.sub);
+    expect((await call('POST', `/v1/challenges/${ch.challengeId}/leave`, b.sub)).statusCode).toBe(
+      200,
+    );
+    expect((await call('POST', `/v1/challenges/${ch.challengeId}/leave`, b.sub)).statusCode).toBe(
+      404,
+    );
+    expect(
+      v1.ChallengeSummary.parse(
+        bodyOf(await call('POST', `/v1/challenges/${ch.challengeId}/join`, b.sub)),
+      ).memberCount,
+    ).toBe(2);
+  });
+});
+
+describe('scoreMember', () => {
+  const d = (minutes: number | null, views: number | null, coverage = 1) => ({
+    localDate: today,
+    minutes,
+    views,
+    coverage,
+  });
+  it('video scores ignore low-coverage and untracked days', () => {
+    expect(scoreMember('fewest_views', [d(1, 10), d(1, 2, 0.5), d(1, null)], null)).toBe(10);
+    expect(scoreMember('fewest_views', [d(1, null)], null)).toBeNull();
+  });
+  it('goal days count kept days against the member’s own minutes goal', () => {
+    expect(scoreMember('goal_days', [d(10, null), d(50, null), d(29, null)], 30)).toBe(2);
+    expect(scoreMember('goal_days', [d(10, null)], null)).toBeNull();
+  });
+});
+
+describe('devices', () => {
+  it('registers up to 10 devices and only the owner can remove one', async () => {
+    const a = await user();
+    const b = await user();
+    const ids = Array.from({ length: 10 }, () => randomUUID());
+    for (const id of ids) {
+      expect(
+        (
+          await call('POST', '/v1/devices', a.sub, {
+            deviceId: id,
+            platform: 'android',
+            pushToken: `token-${id}`,
+          })
+        ).statusCode,
+      ).toBe(200);
+    }
+    expect(
+      bodyOf(
+        await call('POST', '/v1/devices', a.sub, {
+          deviceId: randomUUID(),
+          platform: 'android',
+          pushToken: 'x'.repeat(20),
+        }),
+      ).code,
+    ).toBe('too_many_devices');
+    expect((await call('DELETE', `/v1/devices/${ids[0]}`, b.sub)).statusCode).toBe(404);
+    expect((await call('DELETE', `/v1/devices/${ids[0]}`, a.sub)).statusCode).toBe(200);
+  });
+});

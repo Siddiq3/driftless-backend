@@ -154,7 +154,14 @@ export const Friend = z.object({
   status: z.enum(['pending_out', 'pending_in', 'accepted']),
   since: z.iso.datetime(),
 });
+export type Friend = z.infer<typeof Friend>;
 export const FriendsResponse = z.object({ friends: z.array(Friend) });
+
+/** A one-time code a user shares to let someone add them (expires; 10 chars, no 0/O/1/I). */
+export const InviteResponse = z.object({ code: z.string(), expiresAt: z.iso.datetime() });
+export const FriendRespond = z.strictObject({ userId: Uuid, accept: z.boolean() });
+export const FriendRemove = z.strictObject({ userId: Uuid });
+export const FriendRequestResult = z.object({ friend: Friend });
 
 /* ───────────── Challenges ───────────── */
 
@@ -172,6 +179,20 @@ export const ChallengeCreate = z
     path: ['endDate'],
   });
 
+export const ChallengeSummary = z.object({
+  challengeId: Uuid,
+  ownerId: z.string(),
+  title: DisplayName,
+  metric: z.enum(['fewest_views', 'fewest_minutes', 'goal_days']),
+  startDate: LocalDate,
+  endDate: LocalDate,
+  tz: TimeZone,
+  maxMembers: z.int().min(2).max(50),
+  memberCount: z.int().min(0),
+});
+export type ChallengeSummary = z.infer<typeof ChallengeSummary>;
+export const ChallengesResponse = z.object({ challenges: z.array(ChallengeSummary) });
+
 export const LeaderboardEntry = z.object({
   rank: z.int().min(1),
   userId: z.string(),
@@ -184,7 +205,10 @@ export const LeaderboardResponse = z.object({
   challengeId: Uuid,
   asOf: LocalDate,
   entries: z.array(LeaderboardEntry).max(50),
+  /** Members who haven't turned on sharing with friends; they are never ranked or shown. */
+  hiddenMembers: z.int().min(0).optional(),
 });
+export type LeaderboardResponse = z.infer<typeof LeaderboardResponse>;
 
 /* ───────────── Billing ───────────── */
 
