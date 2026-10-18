@@ -47,7 +47,7 @@ const toProfile = (p: ProfileItem): v1.Profile => ({
   rev: p.rev,
 });
 
-async function loadOrCreateProfile(sub: string): Promise<ProfileItem> {
+export async function loadOrCreateProfile(sub: string): Promise<ProfileItem> {
   const got = await ddb().send(
     new GetCommand({
       TableName: tableName(),
