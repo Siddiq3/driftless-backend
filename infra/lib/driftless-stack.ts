@@ -114,10 +114,13 @@ export class DriftlessStack extends Stack {
         // Set after creating the Pub/Sub push subscription (see infra README): audience + push SA email.
         RTDN_AUDIENCE: props.rtdnAudience ?? '',
         RTDN_SERVICE_ACCOUNT: props.rtdnServiceAccount ?? '',
+        USER_POOL_ID: this.userPool.userPoolId,
       },
     });
     this.table.grantReadWriteData(fn);
     playSecret.grantRead(fn);
+    // Account deletion removes the sign-in identity too (THREAT_MODEL T9).
+    this.userPool.grant(fn, 'cognito-idp:AdminDeleteUser');
 
     const authorizer = new HttpJwtAuthorizer('Jwt', this.userPool.userPoolProviderUrl, {
       jwtAudience: [client.userPoolClientId],

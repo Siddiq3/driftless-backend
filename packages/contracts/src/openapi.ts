@@ -129,6 +129,7 @@ export const ROUTES: readonly Route[] = [
     response: v1.DeletionStatus,
     idempotent: true,
   },
+  { method: 'get', path: '/v1/account/export', summary: 'Export all my data (JSON)' },
   {
     method: 'get',
     path: '/v1/account/delete',

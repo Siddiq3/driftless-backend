@@ -1,6 +1,7 @@
 import { requireCaller, type Caller } from './lib/auth.js';
 import { Errors, HttpError, problem, type ApiEvent, type ApiResult } from './lib/http.js';
 import { log } from './lib/log.js';
+import { getDeleteStatus, getExport, postDeleteAccount } from './modules/account.js';
 import { postPlayRtdn, postPlayVerify } from './modules/billing/index.js';
 import {
   getChallenges,
@@ -44,6 +45,9 @@ export const IMPLEMENTED: Record<string, Handler> = {
   'GET /v1/challenges/{id}/leaderboard': getLeaderboard,
   'POST /v1/devices': postDevice,
   'DELETE /v1/devices/{id}': deleteDevice,
+  'POST /v1/account/delete': postDeleteAccount,
+  'GET /v1/account/delete': getDeleteStatus,
+  'GET /v1/account/export': getExport,
 };
 
 /** Unauthenticated-by-Cognito routes; each verifies its caller itself. */
