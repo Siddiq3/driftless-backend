@@ -151,7 +151,7 @@ const create = async (sub: string, over: Record<string, unknown> = {}) =>
   call('POST', '/v1/challenges', sub, {
     title: 'Calm week',
     metric: 'fewest_minutes',
-    startDate: addDays(today, -2),
+    startDate: addDays(today, -1), // the server allows starting at most yesterday
     endDate: addDays(today, 4),
     tz: 'UTC',
     maxMembers: 3,
@@ -194,7 +194,7 @@ describe('challenges & leaderboards', () => {
     const ch = v1.ChallengeSummary.parse(bodyOf(await create(a.sub)));
     await call('POST', `/v1/challenges/${ch.challengeId}/join`, b.sub);
     await call('POST', `/v1/challenges/${ch.challengeId}/join`, shy.sub);
-    await syncDays(a.sub, { [-2]: 40, [-1]: 20 }); // avg 30
+    await syncDays(a.sub, { [-1]: 40, 0: 20 }); // avg 30
     await syncDays(b.sub, { [-1]: 10, 0: 20 }); // avg 15
     await syncDays(shy.sub, { [-1]: 1 });
     const lb = v1.LeaderboardResponse.parse(
