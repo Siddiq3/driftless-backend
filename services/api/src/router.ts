@@ -1,0 +1,41 @@
+import { requireCaller, type Caller } from './lib/auth.js';
+import { Errors, HttpError, problem, type ApiEvent, type ApiResult } from './lib/http.js';
+import { log } from './lib/log.js';
+import { getMe, patchMe } from './modules/me.js';
+
+type Handler = (event: ApiEvent, caller: Caller) => Promise<ApiResult>;
+
+/** Routes implemented so far. Routes in contracts.ROUTES not listed here return 404 (by design). */
+export const IMPLEMENTED: Record<string, Handler> = {
+  'GET /v1/me': getMe,
+  'PATCH /v1/me': patchMe,
+};
+
+export async function route(event: ApiEvent): Promise<ApiResult> {
+  const method = event.requestContext?.http?.method ?? 'GET';
+  const key = `${method} ${event.rawPath}`;
+  const started = Date.now();
+  let status = 500;
+  try {
+    const handler = IMPLEMENTED[key];
+    const caller = requireCaller(event); // authenticate before revealing which routes exist
+    if (!handler) throw Errors.notFound();
+    const res = await handler(event, caller);
+    status = res.statusCode ?? 200;
+    return res;
+  } catch (e) {
+    if (e instanceof HttpError) {
+      status = e.status;
+      return problem(e);
+    }
+    log.error('unhandled', { route: key, err: e instanceof Error ? e.name : 'unknown' });
+    return problem(new HttpError(500, 'internal', 'internal error'));
+  } finally {
+    log.info('request', {
+      route: key,
+      status,
+      ms: Date.now() - started,
+      reqId: event.requestContext?.requestId,
+    });
+  }
+}

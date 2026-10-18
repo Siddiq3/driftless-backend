@@ -1,0 +1,139 @@
+import { z } from 'zod';
+import { Problem } from './common.js';
+import * as v1 from './v1/index.js';
+
+type Route = {
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete';
+  path: string;
+  summary: string;
+  request?: z.ZodType;
+  response?: z.ZodType;
+  idempotent?: boolean;
+  auth?: boolean;
+};
+
+/** Single source of truth for the v1 HTTP surface. The API router is tested against this list. */
+export const ROUTES: readonly Route[] = [
+  {
+    method: 'get',
+    path: '/v1/me',
+    summary: 'Profile, entitlement, capabilities',
+    response: v1.MeResponse,
+  },
+  {
+    method: 'patch',
+    path: '/v1/me',
+    summary: 'Update profile (If-Match: rev)',
+    request: v1.PatchMeRequest,
+    response: v1.MeResponse,
+  },
+  { method: 'put', path: '/v1/goals', summary: 'Replace goals', request: v1.PutGoalsRequest },
+  {
+    method: 'post',
+    path: '/v1/usage/sync',
+    summary: 'Push daily aggregates',
+    request: v1.UsageSyncRequest,
+    response: v1.UsageSyncResponse,
+    idempotent: true,
+  },
+  {
+    method: 'get',
+    path: '/v1/usage/history',
+    summary: 'History range',
+    response: v1.HistoryResponse,
+  },
+  { method: 'get', path: '/v1/friends', summary: 'List friends', response: v1.FriendsResponse },
+  {
+    method: 'post',
+    path: '/v1/friends/requests',
+    summary: 'Send friend request',
+    request: v1.FriendRequestCreate,
+    idempotent: true,
+  },
+  {
+    method: 'post',
+    path: '/v1/challenges',
+    summary: 'Create challenge',
+    request: v1.ChallengeCreate,
+    idempotent: true,
+  },
+  {
+    method: 'get',
+    path: '/v1/challenges/{id}/leaderboard',
+    summary: 'Leaderboard',
+    response: v1.LeaderboardResponse,
+  },
+  {
+    method: 'post',
+    path: '/v1/billing/play/verify',
+    summary: 'Verify Play purchase',
+    request: v1.PlayVerifyRequest,
+    response: v1.VerifyResponse,
+    idempotent: true,
+  },
+  {
+    method: 'post',
+    path: '/v1/devices',
+    summary: 'Register push device',
+    request: v1.DeviceRegister,
+  },
+  {
+    method: 'post',
+    path: '/v1/account/delete',
+    summary: 'Request account deletion',
+    response: v1.DeletionStatus,
+    idempotent: true,
+  },
+  {
+    method: 'get',
+    path: '/v1/account/delete',
+    summary: 'Deletion status',
+    response: v1.DeletionStatus,
+  },
+];
+
+const schema = (s: z.ZodType) => z.toJSONSchema(s, { io: 'input', unrepresentable: 'any' });
+
+export function buildOpenApi(): Record<string, unknown> {
+  const paths: Record<string, Record<string, unknown>> = {};
+  for (const r of ROUTES) {
+    const op: Record<string, unknown> = {
+      summary: r.summary,
+      security: r.auth === false ? [] : [{ cognito: [] }],
+      parameters: r.idempotent
+        ? [
+            {
+              in: 'header',
+              name: 'Idempotency-Key',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ]
+        : [],
+      responses: {
+        '200': r.response
+          ? { description: 'OK', content: { 'application/json': { schema: schema(r.response) } } }
+          : { description: 'OK' },
+        default: {
+          description: 'Error',
+          content: { 'application/problem+json': { schema: schema(Problem) } },
+        },
+      },
+    };
+    if (r.request) {
+      op.requestBody = {
+        required: true,
+        content: { 'application/json': { schema: schema(r.request) } },
+      };
+    }
+    (paths[r.path] ??= {})[r.method] = op;
+  }
+  return {
+    openapi: '3.1.0',
+    info: { title: 'Driftless API', version: '1.0.0' },
+    components: {
+      securitySchemes: { cognito: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+    },
+    paths,
+  };
+}

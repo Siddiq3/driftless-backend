@@ -1,0 +1,44 @@
+{
+  "name": "@siddiq3/driftless-contracts",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./domain": {
+      "types": "./dist/domain/index.d.ts",
+      "default": "./dist/domain/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "eslint src test",
+    "test": "vitest run --coverage",
+    "openapi": "node dist/openapi-cli.js > openapi.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "description": "Driftless shared API contracts (zod, v1) and pure domain logic",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Siddiq3/driftless-backend.git",
+    "directory": "packages/contracts"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.5"
+  }
+}

@@ -1,0 +1,48 @@
+name: publish-contracts
+
+# Publishes @siddiq3/driftless-contracts to GitHub Packages when a tag contracts-v<version> is pushed.
+on:
+  push:
+    tags: ['contracts-v*']
+
+permissions:
+  contents: write # push the release log to ci-results
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      CI_JOB: publish
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: '@siddiq3'
+      - name: install
+        run: ci/step.sh install pnpm install --frozen-lockfile
+      - name: version matches tag
+        run: |
+          v=$(node -p "require('./packages/contracts/package.json').version")
+          echo "package=$v tag=${GITHUB_REF_NAME}" | tee -a ci-logs/publish/version.log
+          [ "contracts-v$v" = "$GITHUB_REF_NAME" ]
+      - name: build and test
+        run: |
+          ci/step.sh build pnpm --filter @siddiq3/driftless-contracts build
+          ci/step.sh test pnpm --filter @siddiq3/driftless-contracts test
+      - name: publish
+        working-directory: packages/contracts
+        run: ../../ci/step.sh publish pnpm publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: publish log to ci-results
+        if: ${{ always() }}
+        run: |
+          cd ci-logs
+          printf 'tag=%s\nsha=%s\nrun=%s\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" "$GITHUB_RUN_ID" > SUMMARY.txt
+          git init -q -b ci-results && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "release ${GITHUB_REF_NAME}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}" ci-results:release-results
