@@ -89,6 +89,9 @@ export const PutGoalsRequest = z.strictObject({
     }),
 });
 
+export const GoalsResponse = z.object({ goals: z.array(Goal) });
+export type GoalsResponse = z.infer<typeof GoalsResponse>;
+
 /* ───────────── Usage sync ───────────── */
 
 /**

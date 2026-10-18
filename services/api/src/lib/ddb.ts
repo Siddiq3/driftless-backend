@@ -37,6 +37,7 @@ export const Keys = {
   idem: (sub: string, key: string) => ({ pk: `IDEM#${sub}#${key}`, sk: 'IDEM' }),
   /** One aggregate per device per local day (ARCHITECTURE §6, refined: per device, not per platform). */
   day: (localDate: string, deviceId: string) => `DAY#${localDate}#${deviceId}`,
+  goal: (goalId: string) => `GOAL#${goalId}`,
   dayRangeStart: (from: string) => `DAY#${from}#`,
   dayRangeEnd: (to: string) => `DAY#${to}#~`,
 } as const;

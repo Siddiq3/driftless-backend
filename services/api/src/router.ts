@@ -1,6 +1,7 @@
 import { requireCaller, type Caller } from './lib/auth.js';
 import { Errors, HttpError, problem, type ApiEvent, type ApiResult } from './lib/http.js';
 import { log } from './lib/log.js';
+import { getGoals, putGoals } from './modules/goals.js';
 import { getMe, patchMe } from './modules/me.js';
 import { getUsageHistory, postUsageSync } from './modules/usage.js';
 
@@ -10,6 +11,8 @@ type Handler = (event: ApiEvent, caller: Caller) => Promise<ApiResult>;
 export const IMPLEMENTED: Record<string, Handler> = {
   'GET /v1/me': getMe,
   'PATCH /v1/me': patchMe,
+  'GET /v1/goals': getGoals,
+  'PUT /v1/goals': putGoals,
   'POST /v1/usage/sync': postUsageSync,
   'GET /v1/usage/history': getUsageHistory,
 };

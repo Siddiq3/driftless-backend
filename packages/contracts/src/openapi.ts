@@ -27,7 +27,14 @@ export const ROUTES: readonly Route[] = [
     request: v1.PatchMeRequest,
     response: v1.MeResponse,
   },
-  { method: 'put', path: '/v1/goals', summary: 'Replace goals', request: v1.PutGoalsRequest },
+  { method: 'get', path: '/v1/goals', summary: 'List goals', response: v1.GoalsResponse },
+  {
+    method: 'put',
+    path: '/v1/goals',
+    summary: 'Replace the goal set (per-goal rev guards stale writes)',
+    request: v1.PutGoalsRequest,
+    response: v1.GoalsResponse,
+  },
   {
     method: 'post',
     path: '/v1/usage/sync',
