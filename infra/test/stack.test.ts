@@ -44,10 +44,12 @@ describe('DriftlessStack', () => {
     dev.hasResource('AWS::DynamoDB::Table', { DeletionPolicy: 'Delete' });
   });
 
-  it('every API route requires the JWT authorizer', () => {
+  it('every API route requires the JWT authorizer except the signed store webhook', () => {
     const routes = prod.findResources('AWS::ApiGatewayV2::Route');
     expect(Object.keys(routes).length).toBeGreaterThan(0);
-    for (const r of Object.values(routes)) {
+    const open = Object.values(routes).filter((r) => r.Properties.AuthorizationType !== 'JWT');
+    expect(open.map((r) => r.Properties.RouteKey)).toEqual(['POST /webhooks/play-rtdn']);
+    for (const r of Object.values(routes).filter((x) => x.Properties.AuthorizationType === 'JWT')) {
       expect(r.Properties.AuthorizationType).toBe('JWT');
       expect(r.Properties.AuthorizerId).toBeDefined();
     }
@@ -89,6 +91,20 @@ describe('DriftlessStack', () => {
     const ddbStatements = statements.filter((s) => JSON.stringify(s.Action).includes('dynamodb:'));
     expect(ddbStatements.length).toBeGreaterThan(0);
     for (const s of ddbStatements) expect(JSON.stringify(s.Resource)).not.toBe('"*"');
+  });
+
+  it('billing secret exists, is readable by the API only, and holds no value in the template', () => {
+    prod.resourceCountIs('AWS::SecretsManager::Secret', 1);
+    const secret = Object.values(prod.findResources('AWS::SecretsManager::Secret'))[0]!;
+    expect(secret.Properties.SecretString).toBeUndefined();
+    prod.hasResourceProperties('AWS::Lambda::Function', {
+      Environment: {
+        Variables: Match.objectLike({
+          PLAY_SA_SECRET_ARN: Match.anyValue(),
+          PRO_PRODUCT_IDS: 'driftless_pro',
+        }),
+      },
+    });
   });
 
   it('error alarms exist', () => {

@@ -1,6 +1,7 @@
 import { requireCaller, type Caller } from './lib/auth.js';
 import { Errors, HttpError, problem, type ApiEvent, type ApiResult } from './lib/http.js';
 import { log } from './lib/log.js';
+import { postPlayRtdn, postPlayVerify } from './modules/billing/index.js';
 import { getGoals, putGoals } from './modules/goals.js';
 import { getMe, patchMe } from './modules/me.js';
 import { getUsageHistory, postUsageSync } from './modules/usage.js';
@@ -14,7 +15,13 @@ export const IMPLEMENTED: Record<string, Handler> = {
   'GET /v1/goals': getGoals,
   'PUT /v1/goals': putGoals,
   'POST /v1/usage/sync': postUsageSync,
+  'POST /v1/billing/play/verify': postPlayVerify,
   'GET /v1/usage/history': getUsageHistory,
+};
+
+/** Unauthenticated-by-Cognito routes; each verifies its caller itself. */
+export const WEBHOOKS: Record<string, (event: ApiEvent) => Promise<ApiResult>> = {
+  'POST /webhooks/play-rtdn': postPlayRtdn,
 };
 
 export async function route(event: ApiEvent): Promise<ApiResult> {
@@ -23,6 +30,13 @@ export async function route(event: ApiEvent): Promise<ApiResult> {
   const started = Date.now();
   let status = 500;
   try {
+    // Store webhooks authenticate with the store's own signed token, not Cognito.
+    const hook = WEBHOOKS[key];
+    if (hook) {
+      const res = await hook(event);
+      status = res.statusCode ?? 200;
+      return res;
+    }
     const handler = IMPLEMENTED[key];
     const caller = requireCaller(event); // authenticate before revealing which routes exist
     if (!handler) throw Errors.notFound();

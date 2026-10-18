@@ -9,12 +9,16 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as ddb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as secrets from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
 
 export type DriftlessStackProps = StackProps & {
   stage: 'dev' | 'prod';
   /** Directory containing the bundled handler (services/api/dist/api). */
   apiCodeDir?: string;
+  /** Pub/Sub push subscription audience and service account for Play RTDN. */
+  rtdnAudience?: string;
+  rtdnServiceAccount?: string;
 };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -82,6 +86,12 @@ export class DriftlessStack extends Stack {
       },
     });
 
+    /* ── Billing secret: created empty; the owner pastes the Play service-account JSON. Never in code. ── */
+    const playSecret = new secrets.Secret(this, 'PlayServiceAccount', {
+      description: 'Google Play Developer API service account JSON (androidpublisher scope)',
+      removalPolicy: prod ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+
     /* ── API ── */
     const logGroup = new logs.LogGroup(this, 'ApiFnLogs', {
       retention: logs.RetentionDays.ONE_MONTH, // PRIVACY_AND_DATA_RETENTION §1
@@ -95,9 +105,19 @@ export class DriftlessStack extends Stack {
       memorySize: 512,
       timeout: Duration.seconds(10),
       logGroup,
-      environment: { TABLE_NAME: this.table.tableName, NODE_OPTIONS: '--enable-source-maps' },
+      environment: {
+        TABLE_NAME: this.table.tableName,
+        NODE_OPTIONS: '--enable-source-maps',
+        PLAY_PACKAGE_NAME: 'com.siddiqkolimi.driftless',
+        PRO_PRODUCT_IDS: 'driftless_pro',
+        PLAY_SA_SECRET_ARN: playSecret.secretArn,
+        // Set after creating the Pub/Sub push subscription (see infra README): audience + push SA email.
+        RTDN_AUDIENCE: props.rtdnAudience ?? '',
+        RTDN_SERVICE_ACCOUNT: props.rtdnServiceAccount ?? '',
+      },
     });
     this.table.grantReadWriteData(fn);
+    playSecret.grantRead(fn);
 
     const authorizer = new HttpJwtAuthorizer('Jwt', this.userPool.userPoolProviderUrl, {
       jwtAudience: [client.userPoolClientId],
@@ -115,6 +135,12 @@ export class DriftlessStack extends Stack {
       ],
       integration: new HttpLambdaIntegration('ApiIntegration', fn),
       authorizer,
+    });
+    // Store webhooks: no Cognito; the handler verifies Google's signed OIDC token itself.
+    this.api.addRoutes({
+      path: '/webhooks/play-rtdn',
+      methods: [HttpMethod.POST],
+      integration: new HttpLambdaIntegration('WebhookIntegration', fn),
     });
     // Coarse abuse protection; per-user limits live in the API (THREAT_MODEL T8/T12).
     const stage = this.api.defaultStage!.node.defaultChild as CfnStage;
