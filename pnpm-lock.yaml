@@ -67,12 +67,18 @@ importers:
       '@aws-sdk/client-dynamodb':
         specifier: ^3.1152.0
         version: 3.1152.0
+      '@aws-sdk/client-secrets-manager':
+        specifier: ^3.1152.0
+        version: 3.1152.0
       '@aws-sdk/lib-dynamodb':
         specifier: ^3.1152.0
         version: 3.1152.0(@aws-sdk/client-dynamodb@3.1152.0)
       '@siddiq3/driftless-contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      aws-jwt-verify:
+        specifier: ^5.2.1
+        version: 5.2.1
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -101,6 +107,10 @@ packages:
 
   '@aws-sdk/client-dynamodb@3.1152.0':
     resolution: {integrity: sha512-Dr3jy9vbi8ay9C9NBF508KYTYQyKOveBrY776M6tcJxz1rtDx58wgmUpbDJtVcTdrZEextPTQPdfkHEEUdjBeg==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-secrets-manager@3.1152.0':
+    resolution: {integrity: sha512-6Czhl2ksbZjjIjvj74gif1lyHYI5Xa/2KXFlrpY47d3uU7yabu8NJhRl8w01YQoB/WXdaPleUn8q0uwopgTxAw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.978.3':
@@ -753,6 +763,10 @@ packages:
     engines: {node: '>= 18.0.0'}
     hasBin: true
 
+  aws-jwt-verify@5.2.1:
+    resolution: {integrity: sha512-J+buA4M+qvQDk58WXFBLkDodkEX3DDL1ac5XFQPW3opxAsaLXYu5hYnlSHsaBRDBUXBAn695kE/cw/mdyJKwJg==}
+    engines: {node: '>=18.0.0'}
+
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
@@ -1297,6 +1311,17 @@ snapshots:
       '@aws-sdk/credential-provider-node': 3.972.86
       '@aws-sdk/dynamodb-codec': 3.973.48
       '@aws-sdk/middleware-endpoint-discovery': 3.972.32
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.36.0
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-secrets-manager@3.1152.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.3
+      '@aws-sdk/credential-provider-node': 3.972.86
       '@aws-sdk/types': 3.974.6
       '@smithy/core': 3.36.0
       '@smithy/fetch-http-handler': 5.8.0
@@ -1912,6 +1937,8 @@ snapshots:
       constructs: 10.8.1
 
   aws-cdk@2.1145.0: {}
+
+  aws-jwt-verify@5.2.1: {}
 
   balanced-match@4.0.4: {}
 

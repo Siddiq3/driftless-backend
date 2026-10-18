@@ -78,7 +78,7 @@ const rtdn = (bearer: string | null, body: unknown) =>
       headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
     }),
   );
-const push = (n: unknown, messageId = randomUUID()) => ({
+const push = (n: unknown, messageId: string = randomUUID()) => ({
   message: { messageId, data: Buffer.from(JSON.stringify(n)).toString('base64') },
   subscription: 'projects/p/subscriptions/s',
 });
@@ -123,22 +123,22 @@ describe('entitlementFromPlay (pure)', () => {
 describe('POST /v1/billing/play/verify', () => {
   it('server-verifies, grants Pro, acknowledges, and /v1/me reflects it', async () => {
     const sub = newSub();
-    play.subs.set('tok-1', subscription(sub));
-    const r = await verify(sub, 'tok-1');
+    play.subs.set('tok-1-purchase-token', subscription(sub));
+    const r = await verify(sub, 'tok-1-purchase-token');
     expect(r.statusCode).toBe(200);
     expect(v1.VerifyResponse.parse(bodyOf(r)).entitlement).toMatchObject({
       tier: 'pro',
       state: 'active',
     });
-    expect(play.acked).toEqual(['tok-1']);
+    expect(play.acked).toEqual(['tok-1-purchase-token']);
     expect((await me(sub)).entitlement.tier).toBe('pro');
   });
 
   it('rejects a purchase made for another account (token theft)', async () => {
     const owner = newSub();
     const thief = newSub();
-    play.subs.set('tok-2', subscription(owner));
-    const r = await verify(thief, 'tok-2');
+    play.subs.set('tok-2-purchase-token', subscription(owner));
+    const r = await verify(thief, 'tok-2-purchase-token');
     expect(r.statusCode).toBe(403);
     expect(bodyOf(r).code).toBe('purchase_account_mismatch');
     expect((await me(thief)).entitlement.tier).toBe('free');
@@ -147,31 +147,31 @@ describe('POST /v1/billing/play/verify', () => {
   it('a token already bound to one account cannot be bound to another', async () => {
     const a = newSub();
     const b = newSub();
-    play.subs.set('tok-3', subscription(a));
-    expect((await verify(a, 'tok-3')).statusCode).toBe(200);
+    play.subs.set('tok-3-purchase-token', subscription(a));
+    expect((await verify(a, 'tok-3-purchase-token')).statusCode).toBe(200);
     // Even if Google reported b's id (it won't), the binding check still stops it.
-    play.subs.set('tok-3', subscription(b));
-    expect((await verify(b, 'tok-3')).statusCode).toBe(409);
+    play.subs.set('tok-3-purchase-token', subscription(b));
+    expect((await verify(b, 'tok-3-purchase-token')).statusCode).toBe(409);
   });
 
   it('unknown token → 404; wrong or unknown product → 400', async () => {
     const sub = newSub();
-    expect((await verify(sub, 'nope-token')).statusCode).toBe(404);
-    expect((await verify(sub, 'nope-token', 'other_product')).statusCode).toBe(400);
+    expect((await verify(sub, 'nope-token-purchase-token')).statusCode).toBe(404);
+    expect((await verify(sub, 'nope-token-purchase-token', 'other_product')).statusCode).toBe(400);
     play.subs.set(
-      'tok-4',
+      'tok-4-purchase-token',
       subscription(sub, { lineItems: [{ productId: 'other', expiryTime: future }] }),
     );
-    expect((await verify(sub, 'tok-4')).statusCode).toBe(400);
+    expect((await verify(sub, 'tok-4-purchase-token')).statusCode).toBe(400);
   });
 
   it('an expired subscription does not grant Pro', async () => {
     const sub = newSub();
     play.subs.set(
-      'tok-5',
+      'tok-5-purchase-token',
       subscription(sub, { lineItems: [{ productId: 'driftless_pro', expiryTime: past }] }),
     );
-    const r = await verify(sub, 'tok-5');
+    const r = await verify(sub, 'tok-5-purchase-token');
     expect(v1.VerifyResponse.parse(bodyOf(r)).entitlement.tier).toBe('free');
     expect(play.acked).toEqual([]); // nothing to acknowledge without access
   });
@@ -202,13 +202,13 @@ describe('POST /webhooks/play-rtdn', () => {
 
   it('a refund (voided purchase) revokes Pro', async () => {
     const sub = newSub();
-    play.subs.set('tok-6', subscription(sub));
-    await verify(sub, 'tok-6');
+    play.subs.set('tok-6-purchase-token', subscription(sub));
+    await verify(sub, 'tok-6-purchase-token');
     const r = await rtdn(
       'good',
       push({
         packageName: 'com.siddiqkolimi.driftless',
-        voidedPurchaseNotification: { purchaseToken: 'tok-6', productType: 1 },
+        voidedPurchaseNotification: { purchaseToken: 'tok-6-purchase-token', productType: 1 },
       }),
     );
     expect(r.statusCode).toBe(200);
@@ -217,31 +217,38 @@ describe('POST /webhooks/play-rtdn', () => {
 
   it('state changes are re-read from Google (on hold → free, recovered → pro)', async () => {
     const sub = newSub();
-    play.subs.set('tok-7', subscription(sub));
-    await verify(sub, 'tok-7');
-    play.subs.set('tok-7', subscription(sub, { subscriptionState: 'SUBSCRIPTION_STATE_ON_HOLD' }));
+    play.subs.set('tok-7-purchase-token', subscription(sub));
+    await verify(sub, 'tok-7-purchase-token');
+    play.subs.set(
+      'tok-7-purchase-token',
+      subscription(sub, { subscriptionState: 'SUBSCRIPTION_STATE_ON_HOLD' }),
+    );
     await rtdn(
       'good',
-      push({ subscriptionNotification: { notificationType: 5, purchaseToken: 'tok-7' } }),
+      push({
+        subscriptionNotification: { notificationType: 5, purchaseToken: 'tok-7-purchase-token' },
+      }),
     );
     expect((await me(sub)).entitlement).toMatchObject({ tier: 'free', state: 'on_hold' });
     play.subs.set(
-      'tok-7',
+      'tok-7-purchase-token',
       subscription(sub, { acknowledgementState: 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED' }),
     );
     await rtdn(
       'good',
-      push({ subscriptionNotification: { notificationType: 1, purchaseToken: 'tok-7' } }),
+      push({
+        subscriptionNotification: { notificationType: 1, purchaseToken: 'tok-7-purchase-token' },
+      }),
     );
     expect((await me(sub)).entitlement).toMatchObject({ tier: 'pro', state: 'active' });
   });
 
   it('duplicate Pub/Sub deliveries are processed once', async () => {
     const sub = newSub();
-    play.subs.set('tok-8', subscription(sub));
-    await verify(sub, 'tok-8');
+    play.subs.set('tok-8-purchase-token', subscription(sub));
+    await verify(sub, 'tok-8-purchase-token');
     const msg = push(
-      { voidedPurchaseNotification: { purchaseToken: 'tok-8', productType: 1 } },
+      { voidedPurchaseNotification: { purchaseToken: 'tok-8-purchase-token', productType: 1 } },
       'msg-dup-1',
     );
     expect(bodyOf(await rtdn('good', msg))).toEqual({ applied: 'revoked' });
@@ -250,17 +257,22 @@ describe('POST /webhooks/play-rtdn', () => {
 
   it('after an upgrade, notifications for the old token are ignored', async () => {
     const sub = newSub();
-    play.subs.set('old-tok', subscription(sub));
-    await verify(sub, 'old-tok');
-    play.subs.set('new-tok', subscription(sub, { linkedPurchaseToken: 'old-tok' }));
-    await verify(sub, 'new-tok');
+    play.subs.set('old-tok-purchase-token', subscription(sub));
+    await verify(sub, 'old-tok-purchase-token');
     play.subs.set(
-      'old-tok',
+      'new-tok-purchase-token',
+      subscription(sub, { linkedPurchaseToken: 'old-tok-purchase-token' }),
+    );
+    await verify(sub, 'new-tok-purchase-token');
+    play.subs.set(
+      'old-tok-purchase-token',
       subscription(sub, { subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED' }),
     );
     const r = await rtdn(
       'good',
-      push({ subscriptionNotification: { notificationType: 13, purchaseToken: 'old-tok' } }),
+      push({
+        subscriptionNotification: { notificationType: 13, purchaseToken: 'old-tok-purchase-token' },
+      }),
     );
     expect(bodyOf(r)).toEqual({ ignored: 'superseded' });
     expect((await me(sub)).entitlement.tier).toBe('pro');
@@ -277,7 +289,12 @@ describe('POST /webhooks/play-rtdn', () => {
       bodyOf(
         await rtdn(
           'good',
-          push({ subscriptionNotification: { notificationType: 4, purchaseToken: 'never-seen' } }),
+          push({
+            subscriptionNotification: {
+              notificationType: 4,
+              purchaseToken: 'never-seen-purchase-token',
+            },
+          }),
         ),
       ),
     ).toEqual({
