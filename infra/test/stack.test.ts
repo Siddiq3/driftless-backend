@@ -10,7 +10,13 @@ const codeDir = mkdtempSync(path.join(tmpdir(), 'api-'));
 writeFileSync(path.join(codeDir, 'index.mjs'), 'export const handler = async () => ({});');
 
 const synth = (stage: 'dev' | 'prod') =>
-  Template.fromStack(new DriftlessStack(new App(), `T-${stage}`, { stage, apiCodeDir: codeDir }));
+  Template.fromStack(
+    new DriftlessStack(new App(), `T-${stage}`, {
+      stage,
+      apiCodeDir: codeDir,
+      jobsCodeDir: codeDir,
+    }),
+  );
 
 describe('DriftlessStack', () => {
   const prod = synth('prod');
@@ -104,6 +110,13 @@ describe('DriftlessStack', () => {
           PRO_PRODUCT_IDS: 'driftless_pro',
         }),
       },
+    });
+  });
+
+  it('a daily schedule runs the reconcile job', () => {
+    prod.hasResourceProperties('AWS::Events::Rule', {
+      ScheduleExpression: 'cron(17 3 * * ? *)',
+      State: 'ENABLED',
     });
   });
 

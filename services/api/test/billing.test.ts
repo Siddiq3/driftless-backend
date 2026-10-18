@@ -331,3 +331,25 @@ describe('service account assertion', () => {
     ).toBe(true);
   });
 });
+
+describe('reconcile job', () => {
+  it('re-checks expiring Pro entitlements with Google and applies changes', async () => {
+    const { reconcilePlay } = await import('../src/modules/billing/reconcile.js');
+    const sub = newSub();
+    const soon = new Date(Date.now() + 3_600_000).toISOString();
+    play.subs.set(
+      'reconcile-purchase-token',
+      subscription(sub, { lineItems: [{ productId: 'driftless_pro', expiryTime: soon }] }),
+    );
+    await verify(sub, 'reconcile-purchase-token');
+    expect((await me(sub)).entitlement.tier).toBe('pro');
+    // Google says it lapsed, but the notification never arrived.
+    play.subs.set(
+      'reconcile-purchase-token',
+      subscription(sub, { subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED' }),
+    );
+    const r = await reconcilePlay();
+    expect(r.changed).toBeGreaterThanOrEqual(1);
+    expect((await me(sub)).entitlement).toMatchObject({ tier: 'free', state: 'expired' });
+  });
+});

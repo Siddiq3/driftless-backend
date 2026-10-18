@@ -87,17 +87,18 @@ function getDeps() {
 
 /* ───────────── storage ───────────── */
 
-type PurchaseItem = {
+export type PurchaseItem = {
   pk: string;
   sk: 'PURCHASE';
   sub: string;
   productId: string;
   state: string;
   supersededBy?: string;
+  token?: string;
   updatedAt: string;
 };
 
-const purchaseKey = (token: string) => ({
+export const purchaseKey = (token: string) => ({
   pk: `PURCHASE#play#${tokenHash(token)}`,
   sk: 'PURCHASE' as const,
 });
@@ -191,6 +192,8 @@ export async function postPlayVerify(event: ApiEvent, caller: Caller): Promise<A
           ...purchaseKey(purchaseToken),
           sub: caller.sub,
           productId,
+          // Kept (encrypted at rest) so the reconcile job can re-check with Google; never returned to clients.
+          token: purchaseToken,
           state: s.subscriptionState,
           updatedAt: now,
         } satisfies PurchaseItem,

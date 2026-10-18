@@ -7,6 +7,8 @@ import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations
 import { Alarm, ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as ddb from 'aws-cdk-lib/aws-dynamodb';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as secrets from 'aws-cdk-lib/aws-secretsmanager';
@@ -16,6 +18,7 @@ export type DriftlessStackProps = StackProps & {
   stage: 'dev' | 'prod';
   /** Directory containing the bundled handler (services/api/dist/api). */
   apiCodeDir?: string;
+  jobsCodeDir?: string;
   /** Pub/Sub push subscription audience and service account for Play RTDN. */
   rtdnAudience?: string;
   rtdnServiceAccount?: string;
@@ -23,6 +26,7 @@ export type DriftlessStackProps = StackProps & {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_API_CODE_DIR = path.resolve(here, '../../services/api/dist/api');
+export const DEFAULT_JOBS_CODE_DIR = path.resolve(here, '../../services/api/dist/jobs');
 
 export class DriftlessStack extends Stack {
   readonly table: ddb.Table;
@@ -148,6 +152,32 @@ export class DriftlessStack extends Stack {
     // Coarse abuse protection; per-user limits live in the API (THREAT_MODEL T8/T12).
     const stage = this.api.defaultStage!.node.defaultChild as CfnStage;
     stage.defaultRouteSettings = { throttlingBurstLimit: 100, throttlingRateLimit: 50 };
+
+    /* ── Scheduled jobs: daily Play entitlement reconcile (missed RTDN safety net) ── */
+    const jobsFn = new lambda.Function(this, 'JobsFn', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(props.jobsCodeDir ?? DEFAULT_JOBS_CODE_DIR),
+      memorySize: 512,
+      timeout: Duration.minutes(5),
+      logGroup: new logs.LogGroup(this, 'JobsFnLogs', {
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: RemovalPolicy.DESTROY,
+      }),
+      environment: {
+        TABLE_NAME: this.table.tableName,
+        PLAY_PACKAGE_NAME: 'com.siddiqkolimi.driftless',
+        PRO_PRODUCT_IDS: 'driftless_pro',
+        PLAY_SA_SECRET_ARN: playSecret.secretArn,
+      },
+    });
+    this.table.grantReadWriteData(jobsFn);
+    playSecret.grantRead(jobsFn);
+    new events.Rule(this, 'DailyReconcile', {
+      schedule: events.Schedule.cron({ minute: '17', hour: '3' }),
+      targets: [new targets.LambdaFunction(jobsFn)],
+    });
 
     /* ── Ops ── */
     new Alarm(this, 'ApiFnErrors', {
