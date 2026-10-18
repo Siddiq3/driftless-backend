@@ -31,8 +31,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: install
+        # Strict install first. If the lockfile is stale, record that as a failure (the job still
+        # fails) but resolve fresh so every other check runs and the new lockfile is published.
         run: |
-          if [ -f pnpm-lock.yaml ]; then ci/step.sh install pnpm install --frozen-lockfile
+          if [ -f pnpm-lock.yaml ]; then
+            ci/step.sh install pnpm install --frozen-lockfile || ci/step.sh install-unfrozen pnpm install --no-frozen-lockfile
           else ci/step.sh install pnpm install --no-frozen-lockfile; fi
           cp pnpm-lock.yaml ci-logs/node/ 2>/dev/null || true
       - name: build
