@@ -1,19 +1,28 @@
 name: publish-contracts
 
-# Publishes @siddiq3/driftless-contracts to GitHub Packages when a tag contracts-v<version> is pushed.
+# Publishes @siddiq3/driftless-contracts to GitHub Packages when packages/contracts/package.json on
+# main carries a version that has not been published yet, then tags the commit contracts-v<version>.
+# (Bumping the version IS the release action — no manual tag needed.)
 on:
   push:
-    tags: ['contracts-v*']
+    branches: [main]
+    paths: ['packages/contracts/**', '.github/workflows/publish-contracts.yml']
+  workflow_dispatch:
 
 permissions:
-  contents: write # push the release log to ci-results
+  contents: write # create the release tag and push logs to release-results
   packages: write
+
+concurrency:
+  group: publish-contracts
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     env:
       CI_JOB: publish
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,27 +31,40 @@ jobs:
           node-version: 22
           registry-url: https://npm.pkg.github.com
           scope: '@siddiq3'
-      - name: install
-        run: ci/step.sh install pnpm install --frozen-lockfile
-      - name: version matches tag
+      - name: already published?
+        id: check
         run: |
+          mkdir -p ci-logs/publish
           v=$(node -p "require('./packages/contracts/package.json').version")
-          echo "package=$v tag=${GITHUB_REF_NAME}" | tee -a ci-logs/publish/version.log
-          [ "contracts-v$v" = "$GITHUB_REF_NAME" ]
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if npm view "@siddiq3/driftless-contracts@$v" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"; echo "$v already published" | tee ci-logs/publish/check.log
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"; echo "$v not published yet" | tee ci-logs/publish/check.log
+          fi
+      - name: install
+        if: steps.check.outputs.skip == 'false'
+        run: ci/step.sh install pnpm install --frozen-lockfile
       - name: build and test
+        if: steps.check.outputs.skip == 'false'
         run: |
           ci/step.sh build pnpm --filter @siddiq3/driftless-contracts build
           ci/step.sh test pnpm --filter @siddiq3/driftless-contracts test
       - name: publish
+        if: steps.check.outputs.skip == 'false'
         working-directory: packages/contracts
         run: ../../ci/step.sh publish pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: publish log to ci-results
+      - name: tag release
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          git tag "contracts-v${{ steps.check.outputs.version }}"
+          git push origin "contracts-v${{ steps.check.outputs.version }}"
+      - name: publish log to release-results
         if: ${{ always() }}
         run: |
           cd ci-logs
-          printf 'tag=%s\nsha=%s\nrun=%s\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" "$GITHUB_RUN_ID" > SUMMARY.txt
-          git init -q -b ci-results && git add -A
-          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "release ${GITHUB_REF_NAME}"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}" ci-results:release-results
+          printf 'version=%s\nskip=%s\nsha=%s\nrun=%s\nstatus=%s\n' "${{ steps.check.outputs.version }}" \
+            "${{ steps.check.outputs.skip }}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "${{ job.status }}" > SUMMARY.txt
+          git init -q -b release-results && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "release run ${GITHUB_RUN_ID}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}" release-results

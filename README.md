@@ -23,8 +23,8 @@ pnpm --filter @driftless/infra synth
 ## Releasing the contracts package
 
 1. Bump `version` in `packages/contracts/package.json` (semver; breaking schema change = major).
-2. Commit, then tag `contracts-v<version>` and push the tag.
-3. The `publish-contracts` workflow tests and publishes to GitHub Packages.
-4. In the app repo, bump `@siddiq3/driftless-contracts` to the new version.
+2. Merge to `main`. The `publish-contracts` workflow builds, tests, publishes to GitHub Packages
+   and tags the commit `contracts-v<version>`. Versions already published are skipped.
+3. In the app repo, bump `@siddiq3/driftless-contracts` to the new version.
 
 CI publishes step logs for each push to `main` to the `ci-results` branch.
