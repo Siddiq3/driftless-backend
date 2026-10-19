@@ -28,3 +28,11 @@ pnpm --filter @driftless/infra synth
 3. In the app repo, bump `@siddiq3/driftless-contracts` to the new version.
 
 CI publishes step logs for each push to `main` to the `ci-results` branch.
+
+## Google-only account authentication
+
+The API accepts Google ID tokens directly through API Gateway's Google JWT authorizer. No Cognito pool or Hosted UI is provisioned. Provide `googleWebClientIdDev` / `googleWebClientIdProd` CDK context, or the required `GoogleWebClientId` deployment parameter; the Android app must use the same Web OAuth client ID.
+
+See the app's `docs/GOOGLE_SIGN_IN.md` for OAuth/signing-certificate setup, identity mapping, account-deletion behavior and migration considerations. Existing Cognito IDs are not automatically linked to Google subjects. No deployment was performed as part of this change.
+
+Daily/weekly recaps are served by `GET /v1/wrapped?period=daily|weekly&end=YYYY-MM-DD`. This read-only route requires Google auth and cloud-sync consent, derives totals and previous-period comparison from the caller's existing day aggregates, and preserves missing days as unknown. Session/hourly details remain local to the app; no new table or raw event upload is needed. Shared contracts are version 0.4.0; publish/link that version before installing the matching app dependency.

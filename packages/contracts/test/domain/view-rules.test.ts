@@ -133,3 +133,67 @@ describe('view counting fixtures (TEST_PLAN §2)', () => {
     });
   });
 });
+
+describe('asynchronous player caption identity', () => {
+  it('counts a delayed caption on entering while preserving unknown time', () => {
+    expect(
+      countFixture(
+        [o(0, null, { pagerScrolled: false }), o(300, 'a', { pagerScrolled: false })],
+        2500,
+      ),
+    ).toMatchObject({ views: 1, unknownMs: 300 });
+  });
+  it('carries one recent swipe through stale and missing captions', () => {
+    expect(
+      countFixture(
+        [
+          o(0, 'a', { pagerScrolled: false }),
+          o(3000, 'a'),
+          o(3300, null, { pagerScrolled: false }),
+          o(3600, 'b', { pagerScrolled: false }),
+          o(3800, 'b', { pagerScrolled: false }),
+        ],
+        6000,
+      ).views,
+    ).toBe(2);
+  });
+  it('expires pending swipes and never lends a consumed swipe to a caption edit', () => {
+    expect(
+      countFixture(
+        [
+          o(0, 'a', { pagerScrolled: false }),
+          o(3000, 'a'),
+          o(4500, 'edit', { pagerScrolled: false }),
+        ],
+        7000,
+      ).views,
+    ).toBe(1);
+    expect(
+      countFixture(
+        [
+          o(0, 'a', { pagerScrolled: false }),
+          o(3000, 'b'),
+          o(3300, 'edit', { pagerScrolled: false }),
+        ],
+        6000,
+      ).views,
+    ).toBe(1);
+  });
+  it('clears pending identity on leaving and ignores short dwell', () => {
+    expect(
+      countFixture(
+        [
+          o(0, null),
+          leave(300),
+          o(600, null, { pagerScrolled: false }),
+          o(2000, 'late', { pagerScrolled: false }),
+        ],
+        5000,
+      ).views,
+    ).toBe(0);
+    expect(
+      countFixture([o(0, null), o(300, 'skip', { pagerScrolled: false }), o(600, 'watched')], 3000)
+        .views,
+    ).toBe(1);
+  });
+});

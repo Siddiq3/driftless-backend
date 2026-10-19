@@ -235,3 +235,25 @@ export const DeletionStatus = z.object({
   state: z.enum(['none', 'requested', 'in_progress', 'completed']),
   requestedAt: z.iso.datetime().nullable(),
 });
+
+/* ───────────── Private daily / weekly recaps (aggregate data only) ───────────── */
+export const WrapPeriod = z.enum(['daily', 'weekly']);
+export const WrapQuery = z.strictObject({ period: WrapPeriod, end: LocalDate });
+const WrapMetric = z.object({
+  value: z.number().int().nonnegative().nullable(),
+  trackedDays: z.number().int().min(0).max(7),
+});
+export const WrapResponse = z.object({
+  period: WrapPeriod,
+  source: z.literal('synced'),
+  from: LocalDate,
+  to: LocalDate,
+  previousFrom: LocalDate,
+  previousTo: LocalDate,
+  expectedDays: z.number().int().min(1).max(7),
+  views: WrapMetric,
+  minutes: WrapMetric,
+  previousViews: WrapMetric,
+  changePercent: z.number().int().nullable(),
+});
+export type WrapResponse = z.infer<typeof WrapResponse>;

@@ -1,20 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { localDateOf } from '@siddiq3/driftless-contracts/domain';
-import { setIdentityDeleter } from '../src/modules/account.js';
 import { ddb, Keys, tableName } from '../src/lib/ddb.js';
 import { route } from '../src/router.js';
 import { bodyOf, event, newSub } from './helpers.js';
-
-const deleted: string[] = [];
-beforeEach(() => {
-  deleted.length = 0;
-  setIdentityDeleter(async (sub) => {
-    deleted.push(sub);
-  });
-});
 
 const call = (
   method: string,
@@ -58,12 +49,11 @@ describe('account deletion', () => {
     const a = await user();
     const old = Math.floor(Date.now() / 1000) - 3600;
     expect(
-      (await call('POST', '/v1/account/delete', a.sub, undefined, { auth_time: old })).statusCode,
+      (await call('POST', '/v1/account/delete', a.sub, undefined, { iat: old })).statusCode,
     ).toBe(403);
-    expect(deleted).toEqual([]);
   });
 
-  it('removes all data, frees the handle, unlinks friends and challenges, deletes the identity', async () => {
+  it('removes all data, frees the handle, unlinks friends and challenges, leaves Google identity ownership with Google', async () => {
     const a = await user();
     const b = await user();
     // friendship
@@ -122,7 +112,6 @@ describe('account deletion', () => {
     expect(bodyOf(r).state).toBe('completed');
 
     expect(await rowsFor(a.sub)).toEqual([]);
-    expect(deleted).toEqual([a.sub]);
     expect(
       v1.FriendsResponse.parse(bodyOf(await call('GET', '/v1/friends', b.sub))).friends,
     ).toEqual([]);

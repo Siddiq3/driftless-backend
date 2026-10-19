@@ -7,5 +7,14 @@ const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: process.env.CDK_DEFAULT_REGION ?? 'ap-south-1',
 };
-new DriftlessStack(app, 'Driftless-dev', { stage: 'dev', env });
-new DriftlessStack(app, 'Driftless-prod', { stage: 'prod', env, terminationProtection: true });
+new DriftlessStack(app, 'Driftless-dev', {
+  stage: 'dev',
+  env,
+  googleWebClientId: app.node.tryGetContext('googleWebClientIdDev'),
+});
+new DriftlessStack(app, 'Driftless-prod', {
+  stage: 'prod',
+  env,
+  terminationProtection: true,
+  googleWebClientId: app.node.tryGetContext('googleWebClientIdProd'),
+});

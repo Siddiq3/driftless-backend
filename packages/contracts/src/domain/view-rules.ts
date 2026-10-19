@@ -14,6 +14,7 @@
 
 export const DWELL_MS = 1500;
 export const RING_SIZE = 8;
+export const IDENTITY_SETTLE_MS = 1200;
 
 export type Surface = 'short_video' | 'other' | 'unknown';
 
@@ -44,6 +45,7 @@ export class ViewCounter {
   private lastT: number | null = null;
   private lastSurface: Surface = 'other';
   private lastFpNull = false;
+  private transitionUntil: number | null = null;
   readonly tally: Tally = { views: 0, adViews: 0, surfaceMs: 0, unknownMs: 0 };
 
   /** Feed observations in non-decreasing time order. Out-of-order input is ignored. */
@@ -54,6 +56,9 @@ export class ViewCounter {
     const entering = o.surface === 'short_video' && this.lastSurface !== 'short_video';
     this.lastSurface = o.surface;
     this.lastFpNull = o.surface === 'short_video' && o.fingerprint === null;
+    if (o.surface !== 'short_video') this.transitionUntil = null;
+    else if (entering || o.pagerScrolled) this.transitionUntil = o.tMs + IDENTITY_SETTLE_MS;
+    if (this.transitionUntil !== null && o.tMs > this.transitionUntil) this.transitionUntil = null;
 
     if (o.surface !== 'short_video') {
       // Left the feed (comments, profile, another app). Pause the current item; keep the ring.
@@ -67,7 +72,8 @@ export class ViewCounter {
     if (this.cur && this.cur.fp === o.fingerprint) return; // repeated callback, same item
 
     const novel = !this.ring.includes(o.fingerprint);
-    const structural = o.pagerScrolled || entering;
+    const structural = this.transitionUntil !== null;
+    if (structural) this.transitionUntil = null;
     this.remember(o.fingerprint);
     this.cur = {
       fp: o.fingerprint,

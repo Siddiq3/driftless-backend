@@ -13,6 +13,7 @@ const synth = (stage: 'dev' | 'prod') =>
   Template.fromStack(
     new DriftlessStack(new App(), `T-${stage}`, {
       stage,
+      googleWebClientId: 'test-web.apps.googleusercontent.com',
       apiCodeDir: codeDir,
       jobsCodeDir: codeDir,
     }),
@@ -71,13 +72,26 @@ describe('DriftlessStack', () => {
     });
   });
 
-  it('mobile app client is public, PKCE code flow, no implicit grant, revocation on', () => {
-    prod.hasResourceProperties('AWS::Cognito::UserPoolClient', {
-      GenerateSecret: false,
-      AllowedOAuthFlows: ['code'],
-      PreventUserExistenceErrors: 'ENABLED',
-      EnableTokenRevocation: true,
+  it('uses only Google ID tokens and creates no Cognito identity resources', () => {
+    for (const type of ['UserPool', 'UserPoolClient', 'UserPoolIdentityProvider', 'UserPoolDomain'])
+      prod.resourceCountIs(`AWS::Cognito::${type}`, 0);
+    prod.hasResourceProperties('AWS::ApiGatewayV2::Authorizer', {
+      AuthorizerType: 'JWT',
+      JwtConfiguration: {
+        Issuer: 'https://accounts.google.com',
+        Audience: ['test-web.apps.googleusercontent.com'],
+      },
     });
+    prod.hasResourceProperties('AWS::Lambda::Function', {
+      Environment: {
+        Variables: Match.objectLike({
+          GOOGLE_WEB_CLIENT_ID: 'test-web.apps.googleusercontent.com',
+        }),
+      },
+    });
+    const template = JSON.stringify(prod.toJSON());
+    expect(template).not.toContain('cognito-idp:');
+    expect(template).not.toContain('USER_POOL_ID');
   });
 
   it('Lambda runs Node 22 on arm64 with the table name and 30-day logs', () => {
@@ -122,5 +136,28 @@ describe('DriftlessStack', () => {
 
   it('error alarms exist', () => {
     prod.resourceCountIs('AWS::CloudWatch::Alarm', 2);
+  });
+});
+
+describe('Google configuration', () => {
+  it('requires a deployment parameter when no client ID is supplied', () => {
+    const template = Template.fromStack(
+      new DriftlessStack(new App(), 'GoogleParameter', {
+        stage: 'dev',
+        apiCodeDir: codeDir,
+        jobsCodeDir: codeDir,
+      }),
+    );
+    template.hasParameter('GoogleWebClientId', { Type: 'String' });
+    const parameters = template.toJSON().Parameters as Record<string, { AllowedPattern: string }>;
+    const pattern = new RegExp(`^${parameters.GoogleWebClientId!.AllowedPattern}$`);
+    expect(pattern.test('test-web.apps.googleusercontent.com')).toBe(true);
+    expect(pattern.test('not-a-google-client')).toBe(false);
+    template.hasResourceProperties('AWS::ApiGatewayV2::Authorizer', {
+      JwtConfiguration: {
+        Issuer: 'https://accounts.google.com',
+        Audience: [{ Ref: 'GoogleWebClientId' }],
+      },
+    });
   });
 });

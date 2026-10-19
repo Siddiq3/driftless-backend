@@ -16,6 +16,12 @@ type Route = {
 export const ROUTES: readonly Route[] = [
   {
     method: 'get',
+    path: '/v1/wrapped',
+    summary: 'Private daily or weekly recap of synced aggregates',
+    response: v1.WrapResponse,
+  },
+  {
+    method: 'get',
     path: '/v1/me',
     summary: 'Profile, entitlement, capabilities',
     response: v1.MeResponse,

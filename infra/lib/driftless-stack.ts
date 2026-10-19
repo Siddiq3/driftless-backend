@@ -1,11 +1,17 @@
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
-import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import {
+  CfnOutput,
+  CfnParameter,
+  Duration,
+  RemovalPolicy,
+  Stack,
+  type StackProps,
+} from 'aws-cdk-lib';
 import { HttpApi, HttpMethod, type CfnStage } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { Alarm, ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
-import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as ddb from 'aws-cdk-lib/aws-dynamodb';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
@@ -16,6 +22,8 @@ import type { Construct } from 'constructs';
 
 export type DriftlessStackProps = StackProps & {
   stage: 'dev' | 'prod';
+  /** Public Web OAuth client ID; alternatively provided as the GoogleWebClientId stack parameter. */
+  googleWebClientId?: string;
   /** Directory containing the bundled handler (services/api/dist/api). */
   apiCodeDir?: string;
   jobsCodeDir?: string;
@@ -30,7 +38,6 @@ export const DEFAULT_JOBS_CODE_DIR = path.resolve(here, '../../services/api/dist
 
 export class DriftlessStack extends Stack {
   readonly table: ddb.Table;
-  readonly userPool: cognito.UserPool;
   readonly api: HttpApi;
 
   constructor(scope: Construct, id: string, props: DriftlessStackProps) {
@@ -55,40 +62,14 @@ export class DriftlessStack extends Stack {
       projectionType: ddb.ProjectionType.ALL,
     });
 
-    /* ── Identity (D-003). Google / Sign in with Apple IdPs are added when their secrets exist. ── */
-    this.userPool = new cognito.UserPool(this, 'Users', {
-      selfSignUpEnabled: true,
-      signInAliases: { email: true },
-      autoVerify: { email: true },
-      standardAttributes: { email: { required: true, mutable: true } },
-      passwordPolicy: {
-        minLength: 10,
-        requireLowercase: true,
-        requireDigits: true,
-        requireUppercase: false,
-        requireSymbols: false,
-      },
-      mfa: cognito.Mfa.OPTIONAL,
-      mfaSecondFactor: { sms: false, otp: true },
-      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      deletionProtection: prod,
-      removalPolicy: prod ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
-    });
-    const client = this.userPool.addClient('Mobile', {
-      generateSecret: false, // public mobile client → PKCE
-      authFlows: { userSrp: true },
-      preventUserExistenceErrors: true,
-      enableTokenRevocation: true,
-      accessTokenValidity: Duration.minutes(60),
-      idTokenValidity: Duration.minutes(60),
-      refreshTokenValidity: Duration.days(30),
-      oAuth: {
-        flows: { authorizationCodeGrant: true },
-        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL],
-        callbackUrls: ['driftless://auth/callback'],
-        logoutUrls: ['driftless://auth/logout'],
-      },
-    });
+    /* Google signs users in directly. Gateway verifies Google-issued ID tokens. */
+    const googleWebClientId =
+      props.googleWebClientId ??
+      new CfnParameter(this, 'GoogleWebClientId', {
+        type: 'String',
+        allowedPattern: '[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com',
+        description: 'Public Google Web OAuth client ID used by the Android app (not a secret)',
+      }).valueAsString;
 
     /* ── Billing secret: created empty; the owner pastes the Play service-account JSON. Never in code. ── */
     const playSecret = new secrets.Secret(this, 'PlayServiceAccount', {
@@ -118,16 +99,14 @@ export class DriftlessStack extends Stack {
         // Set after creating the Pub/Sub push subscription (see infra README): audience + push SA email.
         RTDN_AUDIENCE: props.rtdnAudience ?? '',
         RTDN_SERVICE_ACCOUNT: props.rtdnServiceAccount ?? '',
-        USER_POOL_ID: this.userPool.userPoolId,
+        GOOGLE_WEB_CLIENT_ID: googleWebClientId,
       },
     });
     this.table.grantReadWriteData(fn);
     playSecret.grantRead(fn);
-    // Account deletion removes the sign-in identity too (THREAT_MODEL T9).
-    this.userPool.grant(fn, 'cognito-idp:AdminDeleteUser');
 
-    const authorizer = new HttpJwtAuthorizer('Jwt', this.userPool.userPoolProviderUrl, {
-      jwtAudience: [client.userPoolClientId],
+    const authorizer = new HttpJwtAuthorizer('GoogleJwt', 'https://accounts.google.com', {
+      jwtAudience: [googleWebClientId],
       identitySource: ['$request.header.Authorization'],
     });
     this.api = new HttpApi(this, 'Api', { createDefaultStage: true });
@@ -143,7 +122,7 @@ export class DriftlessStack extends Stack {
       integration: new HttpLambdaIntegration('ApiIntegration', fn),
       authorizer,
     });
-    // Store webhooks: no Cognito; the handler verifies Google's signed OIDC token itself.
+    // Store webhooks: no app session; the handler verifies Google's signed OIDC token itself.
     this.api.addRoutes({
       path: '/webhooks/play-rtdn',
       methods: [HttpMethod.POST],
@@ -195,7 +174,6 @@ export class DriftlessStack extends Stack {
     });
 
     new CfnOutput(this, 'ApiUrl', { value: this.api.apiEndpoint });
-    new CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
-    new CfnOutput(this, 'UserPoolClientId', { value: client.userPoolClientId });
+    new CfnOutput(this, 'GoogleOAuthClientId', { value: googleWebClientId });
   }
 }

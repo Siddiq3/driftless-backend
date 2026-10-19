@@ -230,7 +230,7 @@ export async function postPlayVerify(event: ApiEvent, caller: Caller): Promise<A
   return json(200, { entitlement } satisfies { entitlement: v1.Entitlement });
 }
 
-/* ───────────── POST /webhooks/play-rtdn (Pub/Sub push, no Cognito) ───────────── */
+/* ───────────── POST /webhooks/play-rtdn (Pub/Sub push, no app-session token) ───────────── */
 
 type PubSubPush = { message?: { data?: string; messageId?: string }; subscription?: string };
 type DeveloperNotification = {

@@ -53,7 +53,7 @@ describe('capabilities', () => {
 });
 
 describe('recent auth', () => {
-  it('requires auth_time within the window', () => {
+  it('requires a fresh Google credential within the window', () => {
     expect(() => requireRecentAuth({ sub: 's', authTime: null }, 1000)).toThrow();
     expect(() => requireRecentAuth({ sub: 's', authTime: 100 }, 1000)).toThrow();
     expect(() => requireRecentAuth({ sub: 's', authTime: 900 }, 1000)).not.toThrow();

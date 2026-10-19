@@ -1,8 +1,4 @@
 import {
-  AdminDeleteUserCommand,
-  CognitoIdentityProviderClient,
-} from '@aws-sdk/client-cognito-identity-provider';
-import {
   BatchWriteCommand,
   GetCommand,
   PutCommand,
@@ -17,20 +13,8 @@ import { json, type ApiEvent, type ApiResult } from '../lib/http.js';
 import { log } from '../lib/log.js';
 import { deleteAllFriendships } from './friends.js';
 
-/** Removes the sign-in identity. Injectable for tests; real one uses Cognito AdminDeleteUser. */
-export type IdentityDeleter = (sub: string) => Promise<void>;
-
-let identityDeleter: IdentityDeleter = async (sub) => {
-  const pool = process.env.USER_POOL_ID;
-  if (!pool) throw new Error('USER_POOL_ID not set');
-  // Cognito usernames for email sign-in are the sub.
-  await new CognitoIdentityProviderClient({}).send(
-    new AdminDeleteUserCommand({ UserPoolId: pool, Username: sub }),
-  );
-};
-export function setIdentityDeleter(d: IdentityDeleter): void {
-  identityDeleter = d;
-}
+// Google owns the sign-in identity. Deletion removes Driftless data, not the Google account.
+// The app revokes its Google grant and signs out after the API confirms deletion.
 
 const jobKey = (sub: string) => ({ pk: `DELETE#${sub}`, sk: 'JOB' });
 
@@ -176,7 +160,6 @@ export async function postDeleteAccount(_e: ApiEvent, caller: Caller): Promise<A
     }),
   );
   await deleteAccountData(caller.sub);
-  await identityDeleter(caller.sub);
   await ddb().send(
     new UpdateCommand({
       TableName: tableName(),

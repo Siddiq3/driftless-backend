@@ -1,9 +1,18 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { googleUserId } from '../src/lib/auth.js';
 import type { ApiEvent, ApiResult } from '../src/lib/http.js';
 
 process.env.TABLE_NAME ??= 'driftless-test';
 
-export const newSub = () => randomUUID();
+process.env.GOOGLE_WEB_CLIENT_ID ??= 'test-web.apps.googleusercontent.com';
+// Test callers use contract UUIDs; Gateway fixtures contain their actual Google subjects.
+const subjects = new Map<string, string>();
+export const newSub = () => {
+  const googleSub = BigInt('0x' + randomBytes(9).toString('hex')).toString();
+  const id = googleUserId(googleSub);
+  subjects.set(id, googleSub);
+  return id;
+};
 
 type EventOpts = {
   method?: string;
@@ -18,13 +27,16 @@ type EventOpts = {
 
 export function event(o: EventOpts): ApiEvent {
   const body = o.rawBody ?? (o.body === undefined ? undefined : JSON.stringify(o.body));
+  const callerSub = o.sub ?? newSub();
   const claims =
     o.sub === null
       ? undefined
       : {
-          sub: o.sub ?? newSub(),
-          token_use: 'access',
-          auth_time: Math.floor(Date.now() / 1000),
+          sub: subjects.get(callerSub) ?? callerSub,
+          iss: 'https://accounts.google.com',
+          aud: process.env.GOOGLE_WEB_CLIENT_ID!,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 3600,
           ...o.claims,
         };
   return {

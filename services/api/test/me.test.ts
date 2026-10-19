@@ -30,9 +30,9 @@ describe('authentication', () => {
     expect(r.headers?.['content-type']).toBe('application/problem+json');
   });
   it('401 for a malformed sub', async () => {
-    expect((await route(event({ path: '/v1/me', sub: 'not-a-uuid' }))).statusCode).toBe(401);
+    expect((await route(event({ path: '/v1/me', sub: 'invalid/subject' }))).statusCode).toBe(401);
   });
-  it('401 for an ID token presented as a bearer token', async () => {
+  it('401 for a Cognito token even when passed in verified-claim fixtures', async () => {
     expect((await route(event({ path: '/v1/me', claims: { token_use: 'id' } }))).statusCode).toBe(
       401,
     );

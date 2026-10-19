@@ -1,3 +1,4 @@
+import { getWrapped } from './modules/wrapped.js';
 import { requireCaller, type Caller } from './lib/auth.js';
 import { Errors, HttpError, problem, type ApiEvent, type ApiResult } from './lib/http.js';
 import { log } from './lib/log.js';
@@ -27,6 +28,7 @@ type Handler = (event: ApiEvent, caller: Caller) => Promise<ApiResult>;
 /** Routes implemented so far. Routes in contracts.ROUTES not listed here return 404 (by design). */
 export const IMPLEMENTED: Record<string, Handler> = {
   'GET /v1/me': getMe,
+  'GET /v1/wrapped': getWrapped,
   'PATCH /v1/me': patchMe,
   'GET /v1/goals': getGoals,
   'PUT /v1/goals': putGoals,
@@ -50,7 +52,7 @@ export const IMPLEMENTED: Record<string, Handler> = {
   'GET /v1/account/export': getExport,
 };
 
-/** Unauthenticated-by-Cognito routes; each verifies its caller itself. */
+/** Routes outside the app JWT authorizer; each verifies its caller itself. */
 export const WEBHOOKS: Record<string, (event: ApiEvent) => Promise<ApiResult>> = {
   'POST /webhooks/play-rtdn': postPlayRtdn,
 };
@@ -86,7 +88,7 @@ export async function route(event: ApiEvent): Promise<ApiResult> {
   const started = Date.now();
   let status = 500;
   try {
-    // Store webhooks authenticate with the store's own signed token, not Cognito.
+    // Store webhooks authenticate with the store's own signed token, not the app session.
     const hook = WEBHOOKS[key];
     if (hook) {
       const res = await hook(event);
