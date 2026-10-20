@@ -33,11 +33,16 @@ export const ROUTES: readonly Route[] = [
     request: v1.PatchMeRequest,
     response: v1.MeResponse,
   },
-  { method: 'get', path: '/v1/goals', summary: 'List goals', response: v1.GoalsResponse },
+  {
+    method: 'get',
+    path: '/v1/goals',
+    summary: 'List goals with a whole-set ETag',
+    response: v1.GoalsResponse,
+  },
   {
     method: 'put',
     path: '/v1/goals',
-    summary: 'Replace the goal set (per-goal rev guards stale writes)',
+    summary: 'Replace goals (If-Match: goal-set ETag; per-goal rev guards also apply)',
     request: v1.PutGoalsRequest,
     response: v1.GoalsResponse,
   },
@@ -172,6 +177,23 @@ export function buildOpenApi(): Record<string, unknown> {
         },
       },
     };
+    if (r.path === '/v1/goals') {
+      if (r.method === 'put')
+        op.parameters = [
+          {
+            in: 'header',
+            name: 'If-Match',
+            required: false,
+            description:
+              'ETag from GET /v1/goals. Use for safe whole-set replacement; stale snapshots return 412. Optional for legacy clients.',
+            schema: { type: 'string' },
+          },
+        ];
+      const responses = op.responses as Record<string, Record<string, unknown>>;
+      responses['200']!.headers = {
+        ETag: { description: 'Current goal-set revision', schema: { type: 'string' } },
+      };
+    }
     if (r.request) {
       op.requestBody = {
         required: true,

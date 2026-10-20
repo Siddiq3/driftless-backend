@@ -71,4 +71,65 @@ describe('goals', () => {
     await put(b, [{ ...g, dailyLimit: 5 }]); // same goalId, different user = separate item
     expect(v1.GoalsResponse.parse(bodyOf(await get(a))).goals[0]!.dailyLimit).toBe(45);
   });
+  it('rejects onboarding seed IDs without weakening UUID validation', async () => {
+    const sub = newSub();
+    for (const goalId of ['setup-views', 'setup-minutes']) {
+      expect((await put(sub, [goal({ goalId })])).statusCode).toBe(400);
+    }
+    expect(v1.GoalsResponse.parse(bodyOf(await get(sub))).goals).toEqual([]);
+  });
+
+  it('rejects stale snapshots without deleting another device goal', async () => {
+    const sub = newSub();
+    const a = goal();
+    const b = goal();
+    const old = await get(sub);
+    const tag = old.headers!.etag as string;
+    expect(tag).toBe('"goals-0"');
+    await put(sub, [b]);
+    const stale = await route(
+      event({
+        method: 'PUT',
+        path: '/v1/goals',
+        sub,
+        body: { goals: [a] },
+        headers: { 'if-match': tag },
+      }),
+    );
+    expect(stale.statusCode).toBe(412);
+    expect(v1.GoalsResponse.parse(bodyOf(await get(sub))).goals).toEqual([b]);
+    const fresh = await get(sub);
+    const written = await route(
+      event({
+        method: 'PUT',
+        path: '/v1/goals',
+        sub,
+        body: { goals: [a, b] },
+        headers: { 'if-match': fresh.headers!.etag as string },
+      }),
+    );
+    expect(written.statusCode).toBe(200);
+    expect(written.headers!.etag).not.toBe(fresh.headers!.etag);
+  });
+
+  it('allows only one concurrent replacement of the same snapshot', async () => {
+    const sub = newSub();
+    const snapshot = await get(sub);
+    const writes = await Promise.all(
+      [goal(), goal()].map((g) =>
+        route(
+          event({
+            method: 'PUT',
+            path: '/v1/goals',
+            sub,
+            body: { goals: [g] },
+            headers: { 'if-match': snapshot.headers!.etag as string },
+          }),
+        ),
+      ),
+    );
+    expect(writes.filter((r) => r.statusCode === 200)).toHaveLength(1);
+    expect(writes.filter((r) => [409, 412].includes(r.statusCode!))).toHaveLength(1);
+    expect(v1.GoalsResponse.parse(bodyOf(await get(sub))).goals).toHaveLength(1);
+  });
 });

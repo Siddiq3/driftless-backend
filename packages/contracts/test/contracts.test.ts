@@ -110,6 +110,14 @@ describe('PatchMeRequest', () => {
 });
 
 describe('Goals', () => {
+  it.each(['setup-views', 'setup-minutes'])('rejects legacy onboarding ID %s', (goalId) => {
+    expect(
+      v1.PutGoalsRequest.safeParse({
+        goals: [{ goalId, metric: 'views', dailyLimit: 50, enabled: true, rev: 1 }],
+      }).success,
+    ).toBe(false);
+  });
+
   const goal = { goalId: DEVICE, metric: 'minutes', dailyLimit: 60, enabled: true, rev: 1 };
   it('enforces minutes ≤ 1440 and unique ids', () => {
     expect(v1.PutGoalsRequest.safeParse({ goals: [goal] }).success).toBe(true);
@@ -147,6 +155,18 @@ describe('OpenAPI', () => {
   });
   it('declares Idempotency-Key on mutating idempotent routes', () => {
     expect(doc.paths['/v1/usage/sync']?.post?.parameters).toHaveLength(1);
+  });
+  it('documents conditional goal writes and goal snapshot ETags', () => {
+    expect(doc.paths['/v1/goals']?.put?.parameters).toEqual([
+      expect.objectContaining({ in: 'header', name: 'If-Match', required: false }),
+    ]);
+    const paths = buildOpenApi().paths as Record<
+      string,
+      Record<string, { responses: Record<string, { headers: unknown }> }>
+    >;
+    for (const method of ['get', 'put']) {
+      expect(paths['/v1/goals']?.[method]?.responses['200']?.headers).toHaveProperty('ETag');
+    }
   });
   it('is OpenAPI 3.1', () => {
     expect(doc.openapi).toBe('3.1.0');

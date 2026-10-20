@@ -3,7 +3,10 @@ import type { Platform, v1 } from '@siddiq3/driftless-contracts';
 /**
  * Server-side feature switches. A capability is only advertised once it has been implemented
  * AND verified (PRODUCT_SPEC: "do not claim functionality works until verified").
- * Phase 1: nothing user-facing has shipped yet, so everything is off.
+ * These are backend rollout/verification gates, NOT observations of device permissions or
+ * a running service. Unverified releases remain disabled; clients must combine eligibility
+ * with live native support, permission, service, consent and entitlement observations.
+ * Defaults intentionally do not certify Android accuracy or enable paid enforcement.
  */
 export type FeatureFlags = {
   androidVideoCounting: boolean; // gated by G-2 (Phase 2 accuracy report)

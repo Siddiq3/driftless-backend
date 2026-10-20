@@ -1,8 +1,8 @@
-import { QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import type { Caller } from '../lib/auth.js';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
-import { Errors, json, parseBody, type ApiEvent, type ApiResult } from '../lib/http.js';
+import { Errors, header, json, parseBody, type ApiEvent, type ApiResult } from '../lib/http.js';
 
 type GoalItem = v1.Goal & { pk: string; sk: string; updatedAt: string };
 
@@ -21,22 +21,53 @@ async function listGoals(sub: string): Promise<v1.Goal[]> {
   });
 }
 
-export async function getGoals(_event: ApiEvent, caller: Caller): Promise<ApiResult> {
-  return json(200, { goals: await listGoals(caller.sub) } satisfies v1.GoalsResponse);
+// Separate from GOAL# items so existing readers/export/deletion keep their behavior.
+const metaKey = (sub: string) => ({ pk: Keys.user(sub), sk: 'GOALSET#META' });
+const revision = async (sub: string): Promise<number> => {
+  const r = await ddb().send(
+    new GetCommand({ TableName: tableName(), Key: metaKey(sub), ConsistentRead: true }),
+  );
+  return (r.Item?.rev as number | undefined) ?? 0;
+};
+const etag = (rev: number) => `"goals-${rev}"`;
+
+async function snapshot(sub: string) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const rev = await revision(sub);
+    const goals = await listGoals(sub);
+    if (rev === (await revision(sub))) return { rev, goals };
+  }
+  throw Errors.conflict('goal_conflict', 'goals changed while reading; retry');
 }
 
-/**
- * Replaces the caller's goal set in one transaction. A goal is written only if its rev is not
- * older than the stored one; goals missing from the request are deleted. All-or-nothing.
+export async function getGoals(_event: ApiEvent, caller: Caller): Promise<ApiResult> {
+  const current = await snapshot(caller.sub);
+  return json(200, { goals: current.goals } satisfies v1.GoalsResponse, {
+    etag: etag(current.rev),
+  });
+}
+
+/** Strict goal validation is unchanged. New clients send If-Match for whole-set safety.
+ * Legacy clients may omit it; every write still guards against concurrent transactions.
  */
 export async function putGoals(event: ApiEvent, caller: Caller): Promise<ApiResult> {
   const { goals } = parseBody(event, v1.PutGoalsRequest);
-  const existing = await listGoals(caller.sub);
+  const current = await snapshot(caller.sub);
+  const match = header(event, 'if-match');
+  if (match !== undefined && match !== etag(current.rev))
+    throw Errors.preconditionFailed('goals changed; reload and retry');
   const now = new Date().toISOString();
   const keep = new Set(goals.map((g) => g.goalId));
-
   const items: NonNullable<ConstructorParameters<typeof TransactWriteCommand>[0]['TransactItems']> =
     [
+      {
+        Put: {
+          TableName: tableName(),
+          Item: { ...metaKey(caller.sub), rev: current.rev + 1 },
+          ConditionExpression: 'attribute_not_exists(pk) OR rev = :rev',
+          ExpressionAttributeValues: { ':rev': current.rev },
+        },
+      },
       ...goals.map((g) => ({
         Put: {
           TableName: tableName(),
@@ -50,7 +81,7 @@ export async function putGoals(event: ApiEvent, caller: Caller): Promise<ApiResu
           ExpressionAttributeValues: { ':rev': g.rev },
         },
       })),
-      ...existing
+      ...current.goals
         .filter((g) => !keep.has(g.goalId))
         .map((g) => ({
           Delete: {
@@ -59,17 +90,15 @@ export async function putGoals(event: ApiEvent, caller: Caller): Promise<ApiResu
           },
         })),
     ];
-  if (items.length > 0) {
-    try {
-      await ddb().send(new TransactWriteCommand({ TransactItems: items }));
-    } catch (e) {
-      if (isConditionalFailure(e))
-        throw Errors.conflict(
-          'goal_conflict',
-          'a goal was changed on another device; reload and retry',
-        );
-      throw e;
-    }
+  try {
+    await ddb().send(new TransactWriteCommand({ TransactItems: items }));
+  } catch (e) {
+    if (isConditionalFailure(e))
+      throw Errors.conflict(
+        'goal_conflict',
+        'a goal was changed on another device; reload and retry',
+      );
+    throw e;
   }
-  return json(200, { goals: await listGoals(caller.sub) } satisfies v1.GoalsResponse);
+  return json(200, { goals } satisfies v1.GoalsResponse, { etag: etag(current.rev + 1) });
 }
