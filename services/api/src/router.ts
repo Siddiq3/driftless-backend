@@ -14,6 +14,7 @@ import {
 import { deleteDevice, postDevice } from './modules/devices.js';
 import {
   getFriends,
+  getFriendsDaily,
   postFriendRemove,
   postFriendRequest,
   postFriendRespond,
@@ -36,6 +37,7 @@ export const IMPLEMENTED: Record<string, Handler> = {
   'POST /v1/billing/play/verify': postPlayVerify,
   'GET /v1/usage/history': getUsageHistory,
   'GET /v1/friends': getFriends,
+  'GET /v1/friends/daily': getFriendsDaily,
   'POST /v1/friends/invites': postInvite,
   'POST /v1/friends/requests': postFriendRequest,
   'POST /v1/friends/respond': postFriendRespond,

@@ -156,6 +156,21 @@ export const Friend = z.object({
 });
 export type Friend = z.infer<typeof Friend>;
 export const FriendsResponse = z.object({ friends: z.array(Friend) });
+export const FriendsDailyQuery = z.strictObject({ date: LocalDate });
+export const DailyFriendCount = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('eligible'),
+    views: z.number().int().nonnegative(),
+    updatedAt: z.iso.datetime(),
+  }),
+  z.object({ status: z.enum(['private', 'unavailable']), views: z.null(), updatedAt: z.null() }),
+]);
+export const FriendsDailyResponse = z.object({
+  localDate: LocalDate,
+  self: DailyFriendCount,
+  friends: z.array(Friend.extend({ daily: DailyFriendCount })),
+});
+export type FriendsDailyResponse = z.infer<typeof FriendsDailyResponse>;
 
 /** A one-time code a user shares to let someone add them (expires; 10 chars, no 0/O/1/I). */
 export const InviteResponse = z.object({ code: z.string(), expiresAt: z.iso.datetime() });

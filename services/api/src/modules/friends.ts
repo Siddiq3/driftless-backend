@@ -8,10 +8,20 @@ import {
   TransactWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
+import { daysBetween, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import type { Caller } from '../lib/auth.js';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
-import { Errors, HttpError, json, parseBody, type ApiEvent, type ApiResult } from '../lib/http.js';
+import {
+  Errors,
+  HttpError,
+  json,
+  parseBody,
+  validate,
+  type ApiEvent,
+  type ApiResult,
+} from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
+import { loadOrCreateProfile } from './me.js';
 
 export const MAX_FRIENDS = 200;
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
@@ -42,6 +52,7 @@ async function listFriendItems(sub: string): Promise<FriendItem[]> {
         KeyConditionExpression: 'pk = :pk AND begins_with(sk, :f)',
         ExpressionAttributeValues: { ':pk': Keys.user(sub), ':f': 'FRIEND#' },
         ExclusiveStartKey: start,
+        ConsistentRead: true,
       }),
     );
     out.push(...((r.Items ?? []) as FriendItem[]));
@@ -92,6 +103,94 @@ async function toFriends(items: FriendItem[]): Promise<v1.Friend[]> {
 
 export async function getFriends(_e: ApiEvent, caller: Caller): Promise<ApiResult> {
   return json(200, { friends: await toFriends(await listFriendItems(caller.sub)) });
+}
+
+/** A local-date comparison, never a raw local candidate count or a missing-device zero. */
+async function dailyCount(sub: string, date: string): Promise<v1.FriendsDailyResponse['self']> {
+  const rows: Array<v1.DailyAggregate & { receivedAt: string; ttl: number }> = [];
+  let start: Record<string, unknown> | undefined;
+  do {
+    const page = await ddb().send(
+      new QueryCommand({
+        TableName: tableName(),
+        KeyConditionExpression: 'pk = :pk AND sk BETWEEN :a AND :b',
+        ExpressionAttributeValues: {
+          ':pk': Keys.user(sub),
+          ':a': Keys.dayRangeStart(date),
+          ':b': Keys.dayRangeEnd(date),
+        },
+        ConsistentRead: true,
+        ExclusiveStartKey: start,
+      }),
+    );
+    rows.push(...((page.Items ?? []) as typeof rows));
+    start = page.LastEvaluatedKey;
+  } while (start);
+  const live = rows.filter((row) => row.ttl > Date.now() / 1000);
+  if (!live.length || live.some((row) => row.views === null || row.coverage < 0.8))
+    return { status: 'unavailable', views: null, updatedAt: null };
+  return {
+    status: 'eligible',
+    views: live.reduce((sum, row) => sum + row.views!, 0),
+    updatedAt: live
+      .map((row) => row.receivedAt)
+      .sort()
+      .at(-1)!,
+  };
+}
+
+export async function getFriendsDaily(event: ApiEvent, caller: Caller): Promise<ApiResult> {
+  const { date } = validate(v1.FriendsDailyQuery, { date: event.queryStringParameters?.date });
+  const age = daysBetween(date, localDateOf(Date.now() + 14 * 3600_000, 'UTC'));
+  if (age < 0 || age >= 400) throw Errors.badRequest('date must be within retained history');
+  const own = await loadOrCreateProfile(caller.sub);
+  if (!own.consent.cloudSync || !own.consent.shareWithFriends)
+    throw new HttpError(
+      403,
+      'consent_required',
+      'Turn on cloud backup and share progress with friends to compare counts.',
+    );
+  await rateLimit(caller.sub, 'friends_daily', 120, 3600);
+  const friends = (await listFriendItems(caller.sub)).filter((row) => row.status === 'accepted');
+  const result: v1.FriendsDailyResponse['friends'] = [];
+  // Bound database fan-out even for a full circle. Strong reads honor withdrawn consent.
+  for (let i = 0; i < friends.length; i += 10) {
+    const batch = await Promise.all(
+      friends.slice(i, i + 10).map(async (friend) => {
+        const profile = await ddb().send(
+          new GetCommand({
+            TableName: tableName(),
+            Key: { pk: Keys.user(friend.otherSub), sk: Keys.profile },
+            ConsistentRead: true,
+          }),
+        );
+        if (!profile.Item?.handle) return null;
+        const consent = profile.Item?.consent as v1.Profile['consent'] | undefined;
+        const daily: v1.FriendsDailyResponse['self'] =
+          consent?.cloudSync && consent.shareWithFriends
+            ? await dailyCount(friend.otherSub, date)
+            : { status: 'private', views: null, updatedAt: null };
+        return {
+          userId: friend.otherSub,
+          handle: profile.Item.handle as string,
+          displayName: (profile.Item.displayName as string | null) ?? null,
+          status: friend.status,
+          since: friend.since,
+          daily,
+        };
+      }),
+    );
+    result.push(...batch.filter((row) => row !== null));
+  }
+  result.sort(
+    (a, b) =>
+      (a.daily.views ?? Infinity) - (b.daily.views ?? Infinity) || a.handle.localeCompare(b.handle),
+  );
+  return json(200, {
+    localDate: date,
+    self: await dailyCount(caller.sub, date),
+    friends: result,
+  } satisfies v1.FriendsDailyResponse);
 }
 
 async function requireOwnHandle(sub: string): Promise<void> {

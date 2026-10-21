@@ -7,6 +7,7 @@ type Route = {
   path: string;
   summary: string;
   request?: z.ZodType;
+  query?: z.ZodObject;
   response?: z.ZodType;
   idempotent?: boolean;
   auth?: boolean;
@@ -61,6 +62,13 @@ export const ROUTES: readonly Route[] = [
     response: v1.HistoryResponse,
   },
   { method: 'get', path: '/v1/friends', summary: 'List friends', response: v1.FriendsResponse },
+  {
+    method: 'get',
+    path: '/v1/friends/daily',
+    summary: 'Compare consented eligible counts for a local date',
+    query: v1.FriendsDailyQuery,
+    response: v1.FriendsDailyResponse,
+  },
   {
     method: 'post',
     path: '/v1/friends/requests',
@@ -177,6 +185,17 @@ export function buildOpenApi(): Record<string, unknown> {
         },
       },
     };
+    if (r.query) {
+      const q = schema(r.query);
+      (op.parameters as unknown[]).push(
+        ...Object.entries(q.properties ?? {}).map(([name, value]) => ({
+          in: 'query',
+          name,
+          required: q.required?.includes(name) ?? false,
+          schema: value,
+        })),
+      );
+    }
     if (r.path === '/v1/goals') {
       if (r.method === 'put')
         op.parameters = [

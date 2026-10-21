@@ -41,6 +41,148 @@ async function befriend(a: { sub: string }, b: { sub: string; handle: string }) 
 const friends = async (sub: string) =>
   v1.FriendsResponse.parse(bodyOf(await call('GET', '/v1/friends', sub))).friends;
 
+describe('daily friend comparisons', () => {
+  const daily = (sub: string, date = today) =>
+    route(event({ path: '/v1/friends/daily', sub, query: { date } }));
+  const sync = async (
+    sub: string,
+    views: number | null,
+    coverage = 1,
+    deviceId = randomUUID(),
+    rev = 1,
+  ) => {
+    const r = await route(
+      event({
+        method: 'POST',
+        path: '/v1/usage/sync',
+        sub,
+        body: {
+          days: [
+            {
+              localDate: today,
+              tz: 'UTC',
+              platform: 'android',
+              deviceId,
+              views,
+              adViews: null,
+              minutes: 10,
+              coverage,
+              rev,
+            },
+          ],
+        },
+        headers: { 'idempotency-key': randomUUID() },
+      }),
+    );
+    expect(r.statusCode).toBe(200);
+  };
+  it('compares eligible counts, combines devices, preserves zero and excludes pending/strangers', async () => {
+    const a = await user(),
+      b = await user(),
+      c = await user(),
+      pending = await user(),
+      stranger = await user();
+    await befriend(a, b);
+    await befriend(a, c);
+    await call('POST', '/v1/friends/requests', a.sub, { handle: pending.handle });
+    await sync(a.sub, 20);
+    await sync(b.sub, 5);
+    await sync(b.sub, 3);
+    await sync(c.sub, 0);
+    await sync(pending.sub, 1);
+    await sync(stranger.sub, 1);
+    const res = await daily(a.sub);
+    expect(res.statusCode).toBe(200);
+    const data = v1.FriendsDailyResponse.parse(bodyOf(res));
+    expect(data.self).toMatchObject({ status: 'eligible', views: 20 });
+    expect(data.friends.map((row) => [row.userId, row.daily.views])).toEqual([
+      [c.sub, 0],
+      [b.sub, 8],
+    ]);
+    expect(
+      v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub, addDays(today, -1)))).self,
+    ).toMatchObject({ status: 'unavailable', views: null });
+  });
+  it('hides counts when sharing is off or withdrawn and removes former friends', async () => {
+    const a = await user(),
+      b = await user(false);
+    await befriend(a, b);
+    await sync(b.sub, 5);
+    expect(v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends[0]!.daily).toEqual({
+      status: 'private',
+      views: null,
+      updatedAt: null,
+    });
+    expect((await daily(b.sub)).statusCode).toBe(403);
+    expect(
+      (
+        await route(
+          event({
+            method: 'PATCH',
+            path: '/v1/me',
+            sub: b.sub,
+            body: { consent: { shareWithFriends: true } },
+            headers: { 'if-match': '2' },
+          }),
+        )
+      ).statusCode,
+    ).toBe(200);
+    expect(v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends[0]!.daily.views).toBe(
+      5,
+    );
+    expect(
+      (
+        await route(
+          event({
+            method: 'PATCH',
+            path: '/v1/me',
+            sub: b.sub,
+            body: { consent: { cloudSync: false, shareWithFriends: false } },
+            headers: { 'if-match': '3' },
+          }),
+        )
+      ).statusCode,
+    ).toBe(200);
+    expect(v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends[0]!.daily.status).toBe(
+      'private',
+    );
+    await call('POST', '/v1/friends/remove', a.sub, { userId: b.sub });
+    expect(v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends).toEqual([]);
+  });
+  it('does not turn missing, low-coverage or incomplete multi-device data into a zero', async () => {
+    const a = await user(),
+      b = await user();
+    await befriend(a, b);
+    expect(
+      v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends[0]!.daily.views,
+    ).toBeNull();
+    const device = randomUUID();
+    await sync(b.sub, 4, 0.79, device);
+    expect(
+      v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends[0]!.daily.views,
+    ).toBeNull();
+    await sync(b.sub, 4, 0.8, device, 2);
+    expect(v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends[0]!.daily.views).toBe(
+      4,
+    );
+    await sync(b.sub, null);
+    expect(
+      v1.FriendsDailyResponse.parse(bodyOf(await daily(a.sub))).friends[0]!.daily.views,
+    ).toBeNull();
+  });
+  it('requires authentication and validates dates', async () => {
+    expect(
+      (await route(event({ path: '/v1/friends/daily', sub: null, query: { date: today } })))
+        .statusCode,
+    ).toBe(401);
+    const a = await user();
+    expect((await daily(a.sub, '2026-02-30')).statusCode).toBe(400);
+    expect((await daily(a.sub, addDays(today, 3))).statusCode).toBe(400);
+    expect((await daily(a.sub, addDays(today, -401))).statusCode).toBe(400);
+    expect((await route(event({ path: '/v1/friends/daily', sub: a.sub }))).statusCode).toBe(400);
+  });
+});
+
 describe('friends', () => {
   it('request by handle → pending both ways → accept → friends', async () => {
     const a = await user();
