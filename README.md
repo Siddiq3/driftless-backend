@@ -7,8 +7,15 @@ contracts package the app consumes. Product docs, architecture and decisions liv
 | Path | What |
 |---|---|
 | `packages/contracts` | `@siddiq3/driftless-contracts` — zod v1 API schemas, OpenAPI, and `./domain` (dates, goals, streaks, Wick, reference view-counting rule). Published to GitHub Packages. |
-| `services/api` | Lambda HTTP API (Node 22, TypeScript) |
-| `infra` | AWS CDK app — synth only; nothing is deployed without an explicit owner decision |
+| `services/api` | Lambda HTTP API (Node 22, JavaScript ESM) |
+| `serverless.yml` | AWS resources and deployment configuration — production deploys automatically after main-branch checks pass |
+
+## Automatic AWS deployment
+
+Push or merge to `main` → GitHub Actions checks → deploy `driftless-api-prod` → check API readiness and authentication.
+No local Docker, database server, AWS CLI or deployment commands are required. GitHub runs the temporary test database and Serverless Framework for you.
+
+One-time setup: create the GitHub environment `prod`, add AWS/Google configuration, and grant the deployment identity access to AWS. See [Deployment setup](docs/DEPLOYMENT.md) for exact variable/secret names, AWS authentication options and where to find the API URL. Workflow files must be committed and pushed before this automation is active.
 
 ## Develop
 
@@ -17,8 +24,10 @@ pnpm install
 pnpm build && pnpm lint && pnpm typecheck
 docker run -d -p 8000:8000 amazon/dynamodb-local
 DDB_ENDPOINT=http://localhost:8000 pnpm test
-pnpm --filter @driftless/infra synth
+GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com pnpm package:aws --stage prod
 ```
+
+The API source, tests and Vitest configuration in `services/api` use JavaScript ESM. Its build bundles JavaScript for Lambda. `pnpm typecheck` checks the shared TypeScript contracts consumed by the mobile app; API validation runs through lint, build and integration tests. Runtime request validation still uses the shared Zod schemas.
 
 ## Releasing the contracts package
 
@@ -31,7 +40,7 @@ CI publishes step logs for each push to `main` to the `ci-results` branch.
 
 ## Google-only account authentication
 
-The API accepts Google ID tokens directly through API Gateway's Google JWT authorizer. No Cognito pool or Hosted UI is provisioned. Provide `googleWebClientIdDev` / `googleWebClientIdProd` CDK context, or the required `GoogleWebClientId` deployment parameter; the Android app must use the same Web OAuth client ID.
+The API accepts Google ID tokens directly through API Gateway's Google JWT authorizer. No Cognito pool or Hosted UI is provisioned. Set `GOOGLE_WEB_CLIENT_ID` for Serverless deployment (the GitHub `prod` environment variable for automatic deploys); the Android app must use the same Web OAuth client ID.
 
 See the app's `docs/GOOGLE_SIGN_IN.md` for OAuth/signing-certificate setup, identity mapping, account-deletion behavior and migration considerations. Existing Cognito IDs are not automatically linked to Google subjects. No deployment was performed as part of this change.
 

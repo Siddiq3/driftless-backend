@@ -37,7 +37,14 @@ export type Tally = {
   unknownMs: number;
 };
 
-type Current = { fp: string; since: number; dwellMs: number; isAd: boolean; pending: boolean; awaitingSignal: boolean };
+type Current = {
+  fp: string;
+  since: number;
+  dwellMs: number;
+  isAd: boolean;
+  pending: boolean;
+  awaitingSignal: boolean;
+};
 
 export class ViewCounter {
   private ring: string[] = [];
@@ -70,7 +77,11 @@ export class ViewCounter {
       return;
     }
     if (this.cur && this.cur.fp === o.fingerprint) {
-      if (this.cur.awaitingSignal && o.pagerScrolled && o.tMs - this.cur.since <= IDENTITY_SETTLE_MS) {
+      if (
+        this.cur.awaitingSignal &&
+        o.pagerScrolled &&
+        o.tMs - this.cur.since <= IDENTITY_SETTLE_MS
+      ) {
         this.cur.awaitingSignal = false;
         this.cur.pending = true;
         this.cur.dwellMs = 0;

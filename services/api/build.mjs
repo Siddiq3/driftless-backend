@@ -1,13 +1,13 @@
-// Bundles each Lambda handler into dist/<name>/index.mjs for CDK `Code.fromAsset`.
+// Bundles each Lambda handler into dist/<name>/index.mjs for Serverless packaging.
 import { build } from 'esbuild';
 import { readdirSync } from 'node:fs';
 
-const handlers = readdirSync('src/handlers').filter((f) => f.endsWith('.ts'));
+const handlers = readdirSync('src/handlers').filter((f) => f.endsWith('.js'));
 await Promise.all(
   handlers.map((f) =>
     build({
       entryPoints: [`src/handlers/${f}`],
-      outfile: `dist/${f.replace(/\.ts$/, '')}/index.mjs`,
+      outfile: `dist/${f.replace(/\.js$/, '')}/index.mjs`,
       bundle: true,
       platform: 'node',
       target: 'node22',

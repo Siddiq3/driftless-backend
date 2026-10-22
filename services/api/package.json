@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src test",
+    "lint": "eslint src test build.mjs vitest.config.js",
     "test": "vitest run"
   },
   "dependencies": {
@@ -18,7 +17,6 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.164",
     "esbuild": "^0.28.2"
   }
 }

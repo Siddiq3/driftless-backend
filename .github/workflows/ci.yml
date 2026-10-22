@@ -4,13 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never interrupt an AWS update. PR-only checks can still be superseded.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   node:
@@ -53,6 +55,9 @@ jobs:
       - name: test
         if: ${{ !cancelled() }}
         run: ci/step.sh test pnpm turbo run test --continue
+      - name: deployment checks
+        if: ${{ !cancelled() }}
+        run: ci/step.sh deployment-checks pnpm test:deployment
       - name: collect coverage
         if: ${{ !cancelled() }}
         run: cp packages/contracts/coverage/coverage-summary.json ci-logs/node/domain-coverage.json 2>/dev/null || true
@@ -64,11 +69,15 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: packages/contracts
         run: node dist/openapi-cli.js > ../../ci-logs/node/openapi.json
-      - name: cdk synth
+      - name: Validate Serverless deployment package
         if: ${{ !cancelled() }}
-        working-directory: infra
-        run: ../ci/step.sh synth pnpm exec cdk synth --quiet
-        env: { CDK_DEFAULT_ACCOUNT: '000000000000', CDK_DEFAULT_REGION: ap-south-1 }
+        env:
+          GOOGLE_WEB_CLIENT_ID: ci-validation.apps.googleusercontent.com
+          SLS_TELEMETRY_DISABLED: '1'
+          AWS_EC2_METADATA_DISABLED: 'true'
+        run: |
+          ci/step.sh serverless-package pnpm exec serverless package --stage prod
+          ci/step.sh template-checks pnpm test:template
       - name: secret scan
         if: ${{ !cancelled() }}
         run: |
@@ -80,6 +89,81 @@ jobs:
       - name: fail if any step failed
         if: ${{ !cancelled() }}
         run: '! grep -v "exit=0" ci-logs/node/status.txt'
+
+  deploy:
+    name: Deploy production to AWS
+    needs: [node]
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: prod
+    concurrency:
+      group: driftless-deploy-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+      SLS_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - name: Check deployment configuration
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: node scripts/deployment.mjs check-config
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Lambda packages from the tested commit
+        run: pnpm build
+      - name: Configure AWS with OpenID Connect
+        if: ${{ env.AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: driftless-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+      - name: Configure AWS with deployment keys
+        if: ${{ env.AWS_ROLE_ARN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+      - name: Guard existing CDK production data
+        # A pre-existing CDK stack needs an explicit resource/data migration first.
+        run: bash scripts/check-legacy-stack.sh
+      - name: Deploy production with Serverless
+        run: pnpm exec serverless deploy --stage prod --region "$AWS_REGION"
+      - name: Protect production stack from deletion
+        run: aws cloudformation update-termination-protection --enable-termination-protection --stack-name driftless-api-prod
+      - name: Export deployment outputs
+        run: aws cloudformation describe-stacks --stack-name driftless-api-prod --query 'Stacks[0].Outputs' --output json > deployment-outputs.json
+      - name: Read API URL
+        id: api
+        run: node scripts/deployment.mjs outputs deployment-outputs.json
+      - name: Check deployed API and authentication
+        env:
+          API_URL: ${{ steps.api.outputs.api_url }}
+        run: node scripts/deployment.mjs smoke
+      - name: Upload deployment outputs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-prod-${{ github.sha }}
+          path: deployment-outputs.json
+          if-no-files-found: ignore
 
   # The Claude session developing this repo cannot read Actions logs directly, so pushes to main
   # publish step logs to the `ci-results` branch. Never runs for pull requests.

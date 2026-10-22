@@ -1,0 +1,183 @@
+service: driftless-api
+frameworkVersion: '3'
+configValidationMode: error
+
+provider:
+  name: aws
+  # Framework v3 validates up to Node 20; CloudFormation overrides below deploy Node 22.
+  runtime: nodejs20.x
+  architecture: arm64
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'ap-south-1'}
+  stackName: driftless-api-${sls:stage}
+  memorySize: 512
+  timeout: 10
+  logRetentionInDays: 30
+  versionFunctions: false
+  deploymentBucket:
+    blockPublicAccess: true
+    serverSideEncryption: AES256
+  environment:
+    TABLE_NAME: { Ref: MainTable }
+    PLAY_PACKAGE_NAME: com.siddiqkolimi.driftless
+    PRO_PRODUCT_IDS: driftless_pro
+    PLAY_SA_SECRET_ARN: { Ref: PlayServiceAccount }
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:BatchGetItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:ConditionCheckItem
+            - dynamodb:DescribeTable
+          Resource:
+            - { Fn::GetAtt: [MainTable, Arn] }
+            - Fn::Join: ['', [{ Fn::GetAtt: [MainTable, Arn] }, '/index/*']]
+        - Effect: Allow
+          Action: secretsmanager:GetSecretValue
+          Resource: { Ref: PlayServiceAccount }
+  httpApi:
+    payload: '2.0'
+    authorizers:
+      googleJwt:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: https://accounts.google.com
+        audience:
+          - ${env:GOOGLE_WEB_CLIENT_ID}
+
+# Existing esbuild bundles include application dependencies; the Node 22 Lambda runtime supplies AWS SDK v3.
+package:
+  individually: true
+  patterns:
+    - '!**'
+    - '!node_modules/**'
+
+functions:
+  api:
+    handler: services/api/dist/api/index.handler
+    package:
+      patterns: ['services/api/dist/api/**']
+    environment:
+      NODE_OPTIONS: --enable-source-maps
+      GOOGLE_WEB_CLIENT_ID: ${env:GOOGLE_WEB_CLIENT_ID}
+      RTDN_AUDIENCE: ${env:RTDN_AUDIENCE, ''}
+      RTDN_SERVICE_ACCOUNT: ${env:RTDN_SERVICE_ACCOUNT, ''}
+    events:
+      - httpApi: { method: GET, path: /health }
+      - httpApi: { method: POST, path: /webhooks/play-rtdn }
+      - httpApi:
+          method: GET
+          path: /v1/{proxy+}
+          authorizer: { name: googleJwt }
+      - httpApi:
+          method: POST
+          path: /v1/{proxy+}
+          authorizer: { name: googleJwt }
+      - httpApi:
+          method: PUT
+          path: /v1/{proxy+}
+          authorizer: { name: googleJwt }
+      - httpApi:
+          method: PATCH
+          path: /v1/{proxy+}
+          authorizer: { name: googleJwt }
+      - httpApi:
+          method: DELETE
+          path: /v1/{proxy+}
+          authorizer: { name: googleJwt }
+  jobs:
+    handler: services/api/dist/jobs/index.handler
+    timeout: 300
+    package:
+      patterns: ['services/api/dist/jobs/**']
+    events:
+      - schedule: cron(17 3 * * ? *)
+
+resources:
+  Conditions:
+    IsProduction: { Fn::Equals: ['${sls:stage}', prod] }
+  extensions:
+    ApiLambdaFunction:
+      Properties:
+        Runtime: nodejs22.x
+    JobsLambdaFunction:
+      Properties:
+        Runtime: nodejs22.x
+    HttpApiStage:
+      Properties:
+        DefaultRouteSettings:
+          ThrottlingBurstLimit: 100
+          ThrottlingRateLimit: 50
+  Resources:
+    MainTable:
+      Type: AWS::DynamoDB::Table
+      # Retain data even if a nonproduction stack is removed or a table is replaced.
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        DeletionProtectionEnabled: { Fn::If: [IsProduction, true, false] }
+        PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+        SSESpecification: { SSEEnabled: true }
+        TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+        AttributeDefinitions:
+          - { AttributeName: pk, AttributeType: S }
+          - { AttributeName: sk, AttributeType: S }
+          - { AttributeName: gsi1pk, AttributeType: S }
+          - { AttributeName: gsi1sk, AttributeType: S }
+        KeySchema:
+          - { AttributeName: pk, KeyType: HASH }
+          - { AttributeName: sk, KeyType: RANGE }
+        GlobalSecondaryIndexes:
+          - IndexName: gsi1
+            KeySchema:
+              - { AttributeName: gsi1pk, KeyType: HASH }
+              - { AttributeName: gsi1sk, KeyType: RANGE }
+            Projection: { ProjectionType: ALL }
+    PlayServiceAccount:
+      Type: AWS::SecretsManager::Secret
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        Description: Google Play Developer API service account JSON (androidpublisher scope)
+    ApiFnErrors:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        Namespace: AWS/Lambda
+        MetricName: Errors
+        Dimensions:
+          - Name: FunctionName
+            Value: { Ref: ApiLambdaFunction }
+        Statistic: Sum
+        Period: 300
+        Threshold: 5
+        EvaluationPeriods: 1
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        TreatMissingData: notBreaching
+    Api5xx:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        Namespace: AWS/ApiGateway
+        MetricName: 5xx
+        Dimensions:
+          - Name: ApiId
+            Value: { Ref: HttpApi }
+        Statistic: Sum
+        Period: 300
+        Threshold: 5
+        EvaluationPeriods: 1
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        TreatMissingData: notBreaching
+  Outputs:
+    ApiUrl:
+      Value: { Fn::GetAtt: [HttpApi, ApiEndpoint] }
+    GoogleOAuthClientId:
+      Value: ${env:GOOGLE_WEB_CLIENT_ID}

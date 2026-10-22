@@ -1,7 +1,7 @@
 node_modules/
 dist/
 coverage/
-cdk.out/
+.serverless/
 .turbo/
 .env*
 !.env.example
@@ -9,3 +9,4 @@ cdk.out/
 *.log
 openapi.json
 ci-logs/
+deployment-outputs.json

@@ -198,18 +198,30 @@ describe('asynchronous player caption identity', () => {
   });
 });
 
-
 describe('identity arriving before the structural signal', () => {
   it('requires fresh dwell after confirmation and ignores duplicate callbacks', () => {
     const c = new ViewCounter();
-    for (const e of [o(0,'a',{pagerScrolled:false}),o(3000,'b',{pagerScrolled:false}),o(3200,'b'),o(3300,'b')]) c.observe(e);
+    for (const e of [
+      o(0, 'a', { pagerScrolled: false }),
+      o(3000, 'b', { pagerScrolled: false }),
+      o(3200, 'b'),
+      o(3300, 'b'),
+    ])
+      c.observe(e);
     expect(c.flush(4699).views).toBe(1);
     expect(c.flush(4700).views).toBe(2);
-    c.observe(o(4800,'b'));
+    c.observe(o(4800, 'b'));
     expect(c.flush(8000).views).toBe(2);
   });
   it('does not revive a stale candidate or recount a recent identity', () => {
-    expect(countFixture([o(0,'a'),o(3000,'b',{pagerScrolled:false}),o(4300,'b')],7000).views).toBe(1);
-    expect(countFixture([o(0,'a'),o(3000,'b'),o(6000,'a',{pagerScrolled:false}),o(6200,'a')],9000).views).toBe(2);
+    expect(
+      countFixture([o(0, 'a'), o(3000, 'b', { pagerScrolled: false }), o(4300, 'b')], 7000).views,
+    ).toBe(1);
+    expect(
+      countFixture(
+        [o(0, 'a'), o(3000, 'b'), o(6000, 'a', { pagerScrolled: false }), o(6200, 'a')],
+        9000,
+      ).views,
+    ).toBe(2);
   });
 });

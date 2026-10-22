@@ -6,18 +6,23 @@
     "node": ">=22"
   },
   "scripts": {
+    "test:deployment": "node --test scripts/deployment.test.mjs",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "package:aws": "pnpm build && serverless package",
+    "deploy": "pnpm build && serverless deploy",
+    "test:template": "node --test scripts/template.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.0",
     "eslint": "^10.13.0",
     "prettier": "3.8.1",
+    "serverless": "3.40.0",
     "turbo": "^2.11.9",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.2",

@@ -1,5 +1,5 @@
 pnpm-lock.yaml
 **/dist
-**/cdk.out
+**/.serverless
 **/coverage
 *.md

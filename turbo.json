@@ -1,9 +1,9 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", "cdk.out/**"] },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
     "typecheck": { "dependsOn": ["^build"] },
     "lint": {},
-    "test": { "dependsOn": ["^build"], "env": ["DDB_ENDPOINT"] }
+    "test": { "dependsOn": ["^build"], "env": ["DDB_ENDPOINT", "TABLE_NAME"] }
   }
 }
