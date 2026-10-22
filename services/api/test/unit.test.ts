@@ -28,13 +28,13 @@ const allOn = {
 };
 
 describe('capabilities', () => {
-  it('blocking and analytics require Pro even when shipped', () => {
+  it('shipped features are included for free accounts', () => {
     const c = computeCapabilities('android', free, allOn);
     expect(c).toMatchObject({
       videoCounting: true,
-      blocking: false,
-      schedules: false,
-      advancedAnalytics: false,
+      blocking: true,
+      schedules: true,
+      advancedAnalytics: true,
     });
     expect(computeCapabilities('android', pro, allOn).blocking).toBe(true);
   });
@@ -44,10 +44,17 @@ describe('capabilities', () => {
     expect(c.socialSharingOfUsage).toBe(false);
     expect(c.minutesTracking).toBe(true);
   });
-  it('a lapsed Pro state does not unlock Pro capabilities', () => {
-    expect(computeCapabilities('android', { ...pro, state: 'on_hold' }, allOn).blocking).toBe(
-      false,
-    );
+  it('included access does not enable unshipped or unverified features', () => {
+    expect(computeCapabilities('android', free)).toMatchObject({
+      videoCounting: false,
+      blocking: false,
+      schedules: false,
+      advancedAnalytics: false,
+    });
+    expect(free.tier).toBe('free');
+  });
+  it('lapsed subscriptions do not restrict included capabilities', () => {
+    expect(computeCapabilities('android', { ...pro, state: 'on_hold' }, allOn).blocking).toBe(true);
     expect(computeCapabilities('android', { ...pro, state: 'grace' }, allOn).blocking).toBe(true);
   });
 });
