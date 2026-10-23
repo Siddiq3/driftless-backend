@@ -19,7 +19,7 @@ provider:
     serverSideEncryption: AES256
   environment:
     TABLE_NAME: { Ref: MainTable }
-    PLAY_PACKAGE_NAME: com.siddiqkolimi.driftless
+    PLAY_PACKAGE_NAME: com.siddiqkolimi.scrollsnooze
     PRO_PRODUCT_IDS: driftless_pro
     PLAY_SA_SECRET_ARN: { Ref: PlayServiceAccount }
   iam:

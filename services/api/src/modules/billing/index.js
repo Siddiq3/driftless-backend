@@ -8,7 +8,7 @@ import { HttpPlayApi } from './play-api.js';
 import { entitlementFromPlay, obfuscatedAccountId, REVOKED, tokenHash } from './play-state.js';
 export function configFromEnv(env = process.env) {
   return {
-    packageName: env.PLAY_PACKAGE_NAME ?? 'com.siddiqkolimi.driftless',
+    packageName: env.PLAY_PACKAGE_NAME ?? 'com.siddiqkolimi.scrollsnooze',
     proProducts: new Set(
       (env.PRO_PRODUCT_IDS ?? 'driftless_pro')
         .split(',')

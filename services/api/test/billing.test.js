@@ -34,7 +34,7 @@ beforeEach(() => {
   setBillingDeps({
     play,
     config: {
-      packageName: 'com.siddiqkolimi.driftless',
+      packageName: 'com.siddiqkolimi.scrollsnooze',
       proProducts: PRO,
       rtdnAudience: 'aud',
       rtdnServiceAccount: SA,
@@ -188,7 +188,7 @@ describe('POST /webhooks/play-rtdn', () => {
     const r = await rtdn(
       'good',
       push({
-        packageName: 'com.siddiqkolimi.driftless',
+        packageName: 'com.siddiqkolimi.scrollsnooze',
         voidedPurchaseNotification: { purchaseToken: 'tok-6-purchase-token', productType: 1 },
       }),
     );

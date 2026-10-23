@@ -92,7 +92,7 @@ EXPO_PUBLIC_API_URL=https://YOUR_API_ID.execute-api.ap-south-1.amazonaws.com
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
 ```
 
-Do not append `/v1`. Build the Android app with those values. Backend deployment does not build or distribute the mobile app. Configure Google's Android OAuth client for `com.siddiqkolimi.driftless` and the relevant signing certificates; see the app's `docs/GOOGLE_SIGN_IN.md`.
+Do not append `/v1`. Build the Android app with those values. Backend deployment does not build or distribute the mobile app. Configure Google's Android OAuth client for `com.siddiqkolimi.scrollsnooze` and the relevant signing certificates; see the app's `docs/GOOGLE_SIGN_IN.md`.
 
 ## What is and is not enabled
 
