@@ -83,7 +83,7 @@ jobs:
         run: |
           curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar xz gitleaks
           ci/step.sh gitleaks ./gitleaks git --redact --no-banner .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with: { name: logs-node, path: ci-logs/node, include-hidden-files: true }
       - name: fail if any step failed
@@ -156,7 +156,7 @@ jobs:
         run: node scripts/deployment.mjs smoke
       - name: Upload deployment outputs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deployment-prod-${{ github.sha }}
           path: deployment-outputs.json
