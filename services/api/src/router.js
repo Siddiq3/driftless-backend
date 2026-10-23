@@ -63,7 +63,7 @@ const PATTERNS = Object.entries(IMPLEMENTED)
     const re = new RegExp(
       '^' + path.replace(/\{(\w+)\}/g, (_x, n) => (names.push(n), '([A-Za-z0-9-]{1,64})')) + '$',
     );
-    return { m, re, names, h };
+    return { m, re, names, h, key: k };
   });
 /** Resolves `/v1/challenges/{id}/join`-style routes and exposes the params as event.pathParameters. */
 function matchPattern(method, event) {
@@ -72,7 +72,7 @@ function matchPattern(method, event) {
     const hit = p.re.exec(event.rawPath);
     if (!hit) continue;
     event.pathParameters = Object.fromEntries(p.names.map((n, i) => [n, hit[i + 1]]));
-    return p.h;
+    return { handler: p.h, label: p.key };
   }
   return undefined;
 }
@@ -80,9 +80,11 @@ export async function route(event) {
   const method = event.requestContext?.http?.method ?? 'GET';
   const key = `${method} ${event.rawPath}`;
   const started = Date.now();
+  let label = 'unmatched';
   let status = 500;
   try {
     if (key === 'GET /health') {
+      label = key;
       const res = await getHealth();
       status = res.statusCode ?? 200;
       return res;
@@ -90,14 +92,18 @@ export async function route(event) {
     // Store webhooks authenticate with the store's own signed token, not the app session.
     const hook = WEBHOOKS[key];
     if (hook) {
+      label = key;
       const res = await hook(event);
       status = res.statusCode ?? 200;
       return res;
     }
-    const handler = IMPLEMENTED[key] ?? matchPattern(method, event);
+    const matched = IMPLEMENTED[key]
+      ? { handler: IMPLEMENTED[key], label: key }
+      : matchPattern(method, event);
+    if (matched) label = matched.label;
     const caller = requireCaller(event); // authenticate before revealing which routes exist
-    if (!handler) throw Errors.notFound();
-    const res = await handler(event, caller);
+    if (!matched) throw Errors.notFound();
+    const res = await matched.handler(event, caller);
     status = res.statusCode ?? 200;
     return res;
   } catch (e) {
@@ -105,11 +111,11 @@ export async function route(event) {
       status = e.status;
       return problem(e);
     }
-    log.error('unhandled', { route: key, err: e instanceof Error ? e.name : 'unknown' });
+    log.error('unhandled', { route: label, err: e instanceof Error ? e.name : 'unknown' });
     return problem(new HttpError(500, 'internal', 'internal error'));
   } finally {
     log.info('request', {
-      route: key,
+      route: label,
       status,
       ms: Date.now() - started,
       reqId: event.requestContext?.requestId,

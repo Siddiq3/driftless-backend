@@ -40,6 +40,7 @@ const TITLES = {
   428: 'Precondition Required',
   429: 'Too Many Requests',
   500: 'Internal Server Error',
+  503: 'Service Unavailable',
 };
 export function problem(err) {
   const body = {

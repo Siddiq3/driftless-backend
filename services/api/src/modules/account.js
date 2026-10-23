@@ -1,5 +1,4 @@
 import {
-  BatchWriteCommand,
   GetCommand,
   PutCommand,
   QueryCommand,
@@ -12,6 +11,7 @@ import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
 import { json } from '../lib/http.js';
 import { log } from '../lib/log.js';
 import { deleteAllFriendships } from './friends.js';
+import { batchDelete } from '../lib/batch.js';
 // Google owns the sign-in identity. Deletion removes Driftless data, not the Google account.
 // The app revokes its Google grant and signs out after the API confirms deletion.
 const jobKey = (sub) => ({ pk: `DELETE#${sub}`, sk: 'JOB' });
@@ -25,19 +25,6 @@ async function queryAll(params) {
   } while (start);
   return out;
 }
-async function batchDelete(keys) {
-  for (let i = 0; i < keys.length; i += 25) {
-    let req = {
-      [tableName()]: keys
-        .slice(i, i + 25)
-        .map((k) => ({ DeleteRequest: { Key: { pk: k.pk, sk: k.sk } } })),
-    };
-    for (let attempt = 0; req && Object.keys(req).length && attempt < 5; attempt++) {
-      const r = await ddb().send(new BatchWriteCommand({ RequestItems: req }));
-      req = r.UnprocessedItems;
-    }
-  }
-}
 /**
  * Deletes everything tied to `sub` (THREAT_MODEL T9). Idempotent: safe to re-run if interrupted.
  * Backups (PITR) still hold deleted items for up to 35 days, as disclosed in the privacy policy.
@@ -47,6 +34,7 @@ export async function deleteAccountData(sub) {
     TableName: tableName(),
     KeyConditionExpression: 'pk = :pk',
     ExpressionAttributeValues: { ':pk': Keys.user(sub) },
+    ConsistentRead: true,
   });
   // 1. Release the handle so the name can be reused.
   const profile = own.find((i) => i.sk === Keys.profile);

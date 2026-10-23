@@ -30,7 +30,6 @@ provider:
             - dynamodb:GetItem
             - dynamodb:BatchGetItem
             - dynamodb:Query
-            - dynamodb:Scan
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
@@ -102,8 +101,14 @@ functions:
       - schedule: cron(17 3 * * ? *)
 
 resources:
+  Parameters:
+    AlertTopicArn:
+      Type: String
+      Default: ''
+      Description: Optional existing SNS topic ARN for operational alarm notifications
   Conditions:
     IsProduction: { Fn::Equals: ['${sls:stage}', prod] }
+    HasAlertTopic: { Fn::Not: [{ Fn::Equals: [{ Ref: AlertTopicArn }, ''] }] }
   extensions:
     ApiLambdaFunction:
       Properties:
@@ -151,6 +156,7 @@ resources:
     ApiFnErrors:
       Type: AWS::CloudWatch::Alarm
       Properties:
+        AlarmActions: { Fn::If: [HasAlertTopic, [{ Ref: AlertTopicArn }], { Ref: 'AWS::NoValue' }] }
         Namespace: AWS/Lambda
         MetricName: Errors
         Dimensions:
@@ -165,6 +171,7 @@ resources:
     Api5xx:
       Type: AWS::CloudWatch::Alarm
       Properties:
+        AlarmActions: { Fn::If: [HasAlertTopic, [{ Ref: AlertTopicArn }], { Ref: 'AWS::NoValue' }] }
         Namespace: AWS/ApiGateway
         MetricName: 5xx
         Dimensions:
@@ -173,6 +180,52 @@ resources:
         Statistic: Sum
         Period: 300
         Threshold: 5
+        EvaluationPeriods: 1
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        TreatMissingData: notBreaching
+    ApiP95Latency:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmActions: { Fn::If: [HasAlertTopic, [{ Ref: AlertTopicArn }], { Ref: 'AWS::NoValue' }] }
+        Namespace: AWS/ApiGateway
+        MetricName: Latency
+        Dimensions:
+          - Name: ApiId
+            Value: { Ref: HttpApi }
+        ExtendedStatistic: p95
+        Period: 300
+        Threshold: 8000
+        EvaluationPeriods: 2
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+        EvaluateLowSampleCountPercentile: ignore
+    ApiThrottles:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmActions: { Fn::If: [HasAlertTopic, [{ Ref: AlertTopicArn }], { Ref: 'AWS::NoValue' }] }
+        Namespace: AWS/Lambda
+        MetricName: Throttles
+        Dimensions:
+          - Name: FunctionName
+            Value: { Ref: ApiLambdaFunction }
+        Statistic: Sum
+        Period: 300
+        Threshold: 1
+        EvaluationPeriods: 1
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        TreatMissingData: notBreaching
+    JobErrors:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmActions: { Fn::If: [HasAlertTopic, [{ Ref: AlertTopicArn }], { Ref: 'AWS::NoValue' }] }
+        Namespace: AWS/Lambda
+        MetricName: Errors
+        Dimensions:
+          - Name: FunctionName
+            Value: { Ref: JobsLambdaFunction }
+        Statistic: Sum
+        Period: 300
+        Threshold: 1
         EvaluationPeriods: 1
         ComparisonOperator: GreaterThanOrEqualToThreshold
         TreatMissingData: notBreaching

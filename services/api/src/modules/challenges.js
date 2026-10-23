@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import {
-  BatchGetCommand,
   GetCommand,
   QueryCommand,
   TransactWriteCommand,
@@ -11,6 +10,7 @@ import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
 import { Errors, json, parseBody } from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
 import { areFriends } from './friends.js';
+import { batchGet } from '../lib/batch.js';
 export const MAX_CHALLENGE_DAYS = 31;
 /** Days below this coverage don't count for video scores (T6: plausibility). */
 const MIN_COVERAGE = 0.8;
@@ -167,31 +167,34 @@ export async function getChallenges(_e, caller) {
   );
   const ids = (r.Items ?? []).map((i) => String(i.gsi1sk).slice('CHAL#'.length));
   if (ids.length === 0) return json(200, { challenges: [] });
-  const got = await ddb().send(
-    new BatchGetCommand({
-      RequestItems: { [tableName()]: { Keys: ids.slice(0, 100).map(metaKey) } },
-    }),
-  );
-  const challenges = (got.Responses?.[tableName()] ?? [])
+  const got = await batchGet(ids.slice(0, 100).map(metaKey));
+  const challenges = got
     .map(toSummary)
     .sort((a, b) => (a.endDate < b.endDate ? 1 : -1));
   return json(200, { challenges });
 }
 async function memberDays(sub, from, to) {
-  const r = await ddb().send(
-    new QueryCommand({
-      TableName: tableName(),
-      KeyConditionExpression: 'pk = :pk AND sk BETWEEN :a AND :b',
-      ExpressionAttributeValues: {
-        ':pk': Keys.user(sub),
-        ':a': Keys.dayRangeStart(from),
-        ':b': Keys.dayRangeEnd(to),
-      },
-    }),
-  );
+  const rows = [];
+  let start;
+  do {
+    const r = await ddb().send(
+      new QueryCommand({
+        TableName: tableName(),
+        ExclusiveStartKey: start,
+        KeyConditionExpression: 'pk = :pk AND sk BETWEEN :a AND :b',
+        ExpressionAttributeValues: {
+          ':pk': Keys.user(sub),
+          ':a': Keys.dayRangeStart(from),
+          ':b': Keys.dayRangeEnd(to),
+        },
+      }),
+    );
+    rows.push(...(r.Items ?? []));
+    start = r.LastEvaluatedKey;
+  } while (start);
   // Combine devices for the same local day (someone with two phones).
   const byDate = new Map();
-  for (const it of r.Items ?? []) {
+  for (const it of rows) {
     const d = it;
     const cur = byDate.get(d.localDate);
     if (!cur) byDate.set(d.localDate, { ...d });
@@ -207,15 +210,21 @@ async function memberDays(sub, from, to) {
   return [...byDate.values()];
 }
 async function minutesGoal(sub) {
-  const r = await ddb().send(
-    new QueryCommand({
-      TableName: tableName(),
-      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :g)',
-      ExpressionAttributeValues: { ':pk': Keys.user(sub), ':g': 'GOAL#' },
-    }),
-  );
-  const g = (r.Items ?? []).find((x) => x.metric === 'minutes' && x.enabled);
-  return g ? g.dailyLimit : null;
+  let start;
+  do {
+    const r = await ddb().send(
+      new QueryCommand({
+        TableName: tableName(),
+        ExclusiveStartKey: start,
+        KeyConditionExpression: 'pk = :pk AND begins_with(sk, :g)',
+        ExpressionAttributeValues: { ':pk': Keys.user(sub), ':g': 'GOAL#' },
+      }),
+    );
+    const g = (r.Items ?? []).find((x) => x.metric === 'minutes' && x.enabled);
+    if (g) return g.dailyLimit;
+    start = r.LastEvaluatedKey;
+  } while (start);
+  return null;
 }
 /** Score for one member, or null if they have no usable data. Lower is better except goal_days. */
 export function scoreMember(metric, days, goalMinutes) {
@@ -237,6 +246,7 @@ export function scoreMember(metric, days, goalMinutes) {
 export async function getLeaderboard(event, caller) {
   const id = idParam(event);
   if (!(await isMember(id, caller.sub))) throw Errors.notFound(); // non-members can't see members
+  await rateLimit(caller.sub, 'leaderboard', 120, 3600);
   const meta = await getMeta(id);
   const today = localDateOf(Date.now(), meta.tz);
   const to = today < meta.endDate ? today : meta.endDate;
@@ -248,36 +258,27 @@ export async function getLeaderboard(event, caller) {
     }),
   );
   const subs = (members.Items ?? []).map((m) => m.sub).slice(0, 50);
-  const prof = await ddb().send(
-    new BatchGetCommand({
-      RequestItems: {
-        [tableName()]: { Keys: subs.map((s) => ({ pk: Keys.user(s), sk: Keys.profile })) },
-      },
-    }),
-  );
+  const prof = await batchGet(subs.map((s) => ({ pk: Keys.user(s), sk: Keys.profile })), true);
   const profiles = new Map(
-    (prof.Responses?.[tableName()] ?? []).map((p) => [String(p.pk).slice('USER#'.length), p]),
+    prof.map((p) => [String(p.pk).slice('USER#'.length), p]),
   );
-  let hidden = 0;
   const scored = [];
-  for (const sub of subs) {
-    const p = profiles.get(sub);
-    // Only members who chose to share with friends are ranked (consent, D-009/T7).
-    if (!p?.handle || !p.consent?.shareWithFriends || meta.startDate > to) {
-      hidden++;
-      continue;
-    }
-    const score = scoreMember(
-      meta.metric,
-      await memberDays(sub, meta.startDate, to),
-      meta.metric === 'goal_days' ? await minutesGoal(sub) : null,
-    );
-    if (score === null) {
-      hidden++;
-      continue;
-    }
-    scored.push({ userId: sub, handle: p.handle, score });
+  // Bound fan-out while avoiding a network round trip per member in series.
+  for (let offset = 0; offset < subs.length; offset += 10) {
+    const batch = await Promise.all(subs.slice(offset, offset + 10).map(async (sub) => {
+      const p = profiles.get(sub);
+      if (!p?.handle || !p.consent?.cloudSync || !p.consent.shareWithFriends || meta.startDate > to)
+        return null;
+      const [days, goal] = await Promise.all([
+        memberDays(sub, meta.startDate, to),
+        meta.metric === 'goal_days' ? minutesGoal(sub) : Promise.resolve(null),
+      ]);
+      const score = scoreMember(meta.metric, days, goal);
+      return score === null ? null : { userId: sub, handle: p.handle, score };
+    }));
+    scored.push(...batch.filter((member) => member !== null));
   }
+  const hidden = subs.length - scored.length;
   const higherIsBetter = meta.metric === 'goal_days';
   scored.sort((a, b) => (higherIsBetter ? b.score - a.score : a.score - b.score));
   const entries = [];

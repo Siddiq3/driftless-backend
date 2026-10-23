@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { describe, expect, it } from 'vitest';
+import { BatchWriteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { describe, expect, it, vi } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { ddb, Keys, tableName } from '../src/lib/ddb.js';
@@ -35,6 +35,27 @@ const rowsFor = async (sub) =>
     )
   ).Items ?? [];
 describe('account deletion', () => {
+  it('keeps deletion in progress and retryable when DynamoDB leaves unprocessed records', async () => {
+    const a = await user();
+    const client = ddb();
+    const realSend = client.send.bind(client);
+    const send = vi.spyOn(client, 'send').mockImplementation((command) =>
+      command instanceof BatchWriteCommand
+        ? Promise.resolve({ UnprocessedItems: command.input.RequestItems })
+        : realSend(command),
+    );
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      expect((await call('POST', '/v1/account/delete', a.sub)).statusCode).toBe(503);
+      expect(bodyOf(await call('GET', '/v1/account/delete', a.sub)).state).toBe('in_progress');
+      expect((await rowsFor(a.sub)).length).toBeGreaterThan(0);
+    } finally {
+      send.mockRestore();
+      random.mockRestore();
+    }
+    expect((await call('POST', '/v1/account/delete', a.sub)).statusCode).toBe(200);
+    expect(await rowsFor(a.sub)).toEqual([]);
+  });
   it('requires a recent sign-in', async () => {
     const a = await user();
     const old = Math.floor(Date.now() / 1000) - 3600;

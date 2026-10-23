@@ -83,6 +83,7 @@ test('IAM data access stays scoped to this stack and billing secret is retained'
   const statements =
     resources.IamRoleLambdaExecution.Properties.Policies[0].PolicyDocument.Statement;
   const data = statements.find((item) => item.Action.includes('dynamodb:GetItem'));
+  assert.equal(data.Action.includes('dynamodb:Scan'), false);
   assert.deepEqual(data.Resource, [
     { 'Fn::GetAtt': ['MainTable', 'Arn'] },
     { 'Fn::Join': ['', [{ 'Fn::GetAtt': ['MainTable', 'Arn'] }, '/index/*']] },
@@ -100,7 +101,16 @@ test('scheduled reconciliation, logs, throttling and error alarms remain enabled
   assert.equal(schedule.ScheduleExpression, 'cron(17 3 * * ? *)');
   assert.equal(schedule.State, 'ENABLED');
   for (const log of ofType('AWS::Logs::LogGroup')) assert.equal(log.Properties.RetentionInDays, 30);
-  assert.equal(ofType('AWS::CloudWatch::Alarm').length, 2);
+  assert.equal(ofType('AWS::CloudWatch::Alarm').length, 5);
+  assert.equal(resources.ApiP95Latency.Properties.ExtendedStatistic, 'p95');
+  assert.equal(resources.ApiThrottles.Properties.MetricName, 'Throttles');
+  assert.equal(resources.JobErrors.Properties.MetricName, 'Errors');
+  assert.equal(template.Parameters.AlertTopicArn.Default, '');
+  for (const alarm of ofType('AWS::CloudWatch::Alarm')) {
+    assert.deepEqual(alarm.Properties.AlarmActions, {
+      'Fn::If': ['HasAlertTopic', [{ Ref: 'AlertTopicArn' }], { Ref: 'AWS::NoValue' }],
+    });
+  }
   assert.deepEqual(resources.HttpApiStage.Properties.DefaultRouteSettings, {
     ThrottlingBurstLimit: 100,
     ThrottlingRateLimit: 50,

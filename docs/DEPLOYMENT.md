@@ -115,3 +115,13 @@ Deploying does not implement the pending guest-to-account data migration or cert
 | Google sign-in fails | Match the Web client ID across GitHub variables and the app, and register the app's signing certificate SHA-1 in Google Cloud. |
 
 Automation becomes active after these source changes are pushed. Provisioning AWS identities, configuring GitHub settings and the first live deployment are external setup steps; writing this workflow does not perform them.
+
+## Audit branch observability changes (23 October 2026)
+
+The security/API audit branch adds API p95 latency, API Lambda throttle and reconciliation error alarms, alongside existing API/Lambda error alarms. It removes the unused DynamoDB Scan permission and logs matched route templates rather than raw caller paths. Normal requests log route, HTTP status, duration and request ID only. Query logs can supply endpoint counts, error ratios and p50/p95/p99; these statistics have not been collected by this audit.
+
+All five alarms accept an optional CloudFormation parameter `AlertTopicArn` for an existing operator-owned SNS topic. An empty parameter leaves notification actions absent. Configure the ARN through the approved stack-parameter workflow and verify topic policy, subscription and delivery before claiming paging is active. No topic or email subscription is created automatically. Three additional alarms may add recurring cost; no billing-based savings or revenue ratio has been measured. Thresholds are starting values requiring traffic-based calibration, not an SLO certification.
+
+The patch's Play delivery lease is 60 seconds, longer than the configured 10-second API Lambda timeout. A fresh duplicate while work is in progress returns 503, successful completion is retained for seven days, and failures release only the current owner's claim. Process termination leaves a recoverable lease. This is at-least-once business processing, not a guarantee of exactly-once external Google calls. Legacy statusless receipt markers retain their old duplicate semantics until expiration; previously lost events require a separately reviewed reconciliation plan. The audit did not replay production events.
+
+Deletion failure returns retryable 503 and leaves the job in progress when database deletes remain unprocessed. There is no automatic deletion worker in the current source. Account lifecycle/write fencing, historical purchase cleanup, invite cleanup and the guest/account storage migration remain separate release blockers documented by the audit; this patch does not certify deletion completeness under concurrent writes.

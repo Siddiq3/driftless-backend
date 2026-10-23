@@ -1,6 +1,5 @@
 import { randomInt } from 'node:crypto';
 import {
-  BatchGetCommand,
   DeleteCommand,
   GetCommand,
   PutCommand,
@@ -13,6 +12,7 @@ import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
 import { Errors, HttpError, json, parseBody, validate } from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
 import { loadOrCreateProfile } from './me.js';
+import { batchGet } from '../lib/batch.js';
 export const MAX_FRIENDS = 200;
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 const INVITE_TTL_SEC = 7 * 86_400;
@@ -48,10 +48,7 @@ async function profiles(subs) {
   const map = new Map();
   for (let i = 0; i < subs.length; i += 100) {
     const keys = subs.slice(i, i + 100).map((s) => ({ pk: Keys.user(s), sk: Keys.profile }));
-    const r = await ddb().send(
-      new BatchGetCommand({ RequestItems: { [tableName()]: { Keys: keys } } }),
-    );
-    for (const p of r.Responses?.[tableName()] ?? []) {
+    for (const p of await batchGet(keys)) {
       const sub = String(p.pk).slice('USER#'.length);
       if (p.handle)
         map.set(sub, {

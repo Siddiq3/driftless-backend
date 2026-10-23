@@ -1,5 +1,5 @@
 import { createVerify, generateKeyPairSync, randomUUID } from 'node:crypto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { setBillingDeps } from '../src/modules/billing/index.js';
 import { serviceAccountAssertion } from '../src/modules/billing/play-api.js';
@@ -176,6 +176,27 @@ describe('POST /v1/billing/play/verify', () => {
   });
 });
 describe('POST /webhooks/play-rtdn', () => {
+  it('retries the same message after a transient Play failure', async () => {
+    const sub = newSub();
+    const token = 'retry-after-failure-purchase-token';
+    play.subs.set(token, subscription(sub));
+    await verify(sub, token);
+    play.subs.set(token, subscription(sub, { subscriptionState: 'SUBSCRIPTION_STATE_ON_HOLD' }));
+    const msg = push({ subscriptionNotification: { notificationType: 5, purchaseToken: token } });
+    const lookup = vi.spyOn(play, 'getSubscription').mockRejectedValueOnce(new Error('temporary'));
+    try {
+      expect((await rtdn('good', msg)).statusCode).toBe(500);
+      expect((await me(sub)).entitlement.tier).toBe('pro');
+      expect((await rtdn('good', msg)).statusCode).toBe(200);
+      expect((await me(sub)).entitlement.state).toBe('on_hold');
+    } finally {
+      lookup.mockRestore();
+    }
+  });
+  it('returns 400 for malformed authenticated payloads before claiming their ids', async () => {
+    expect((await rtdn('good', { message: { messageId: randomUUID(), data: 'not-base64!' } })).statusCode).toBe(400);
+    expect((await rtdn('good', { message: { messageId: randomUUID(), data: Buffer.from('{').toString('base64') } })).statusCode).toBe(400);
+  });
   it('requires a valid Google-signed token from the configured push account', async () => {
     expect((await rtdn(null, push({}))).statusCode).toBe(401);
     expect((await rtdn('forged', push({}))).statusCode).toBe(401);
