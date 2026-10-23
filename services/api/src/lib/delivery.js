@@ -17,18 +17,33 @@ export async function withDelivery(id, processDelivery) {
   const now = Math.floor(Date.now() / 1000);
   const owner = randomUUID();
   try {
-    await ddb().send(new PutCommand({
-      TableName: tableName(),
-      Item: { ...key, status: 'processing', owner, leaseUntil: now + LEASE_SECONDS, ttl: now + MEMORY_SECONDS },
-      ConditionExpression: 'attribute_not_exists(pk) OR (#s = :processing AND leaseUntil <= :now) OR #ttl <= :now',
-      ExpressionAttributeNames: { '#s': 'status', '#ttl': 'ttl' },
-      ExpressionAttributeValues: { ':processing': 'processing', ':now': now },
-    }));
+    await ddb().send(
+      new PutCommand({
+        TableName: tableName(),
+        Item: {
+          ...key,
+          status: 'processing',
+          owner,
+          leaseUntil: now + LEASE_SECONDS,
+          ttl: now + MEMORY_SECONDS,
+        },
+        ConditionExpression:
+          'attribute_not_exists(pk) OR (#s = :processing AND leaseUntil <= :now) OR #ttl <= :now',
+        ExpressionAttributeNames: { '#s': 'status', '#ttl': 'ttl' },
+        ExpressionAttributeValues: { ':processing': 'processing', ':now': now },
+      }),
+    );
   } catch (e) {
     if (!isConditionalFailure(e)) throw e;
-    const existing = (await ddb().send(new GetCommand({
-      TableName: tableName(), Key: key, ConsistentRead: true,
-    }))).Item;
+    const existing = (
+      await ddb().send(
+        new GetCommand({
+          TableName: tableName(),
+          Key: key,
+          ConsistentRead: true,
+        }),
+      )
+    ).Item;
     // Statusless records were completed receipt markers written by the old version.
     if (existing && existing.ttl > now && (existing.status === 'done' || !existing.status))
       return json(200, { duplicate: true });
@@ -38,22 +53,32 @@ export async function withDelivery(id, processDelivery) {
     const response = await processDelivery();
     if ((response.statusCode ?? 200) < 200 || (response.statusCode ?? 200) >= 300)
       throw new Error('Delivery did not complete');
-    await ddb().send(new UpdateCommand({
-      TableName: tableName(), Key: key,
-      UpdateExpression: 'SET #s = :done REMOVE leaseUntil',
-      ConditionExpression: '#owner = :owner AND #s = :processing',
-      ExpressionAttributeNames: { '#s': 'status', '#owner': 'owner' },
-      ExpressionAttributeValues: { ':done': 'done', ':processing': 'processing', ':owner': owner },
-    }));
+    await ddb().send(
+      new UpdateCommand({
+        TableName: tableName(),
+        Key: key,
+        UpdateExpression: 'SET #s = :done REMOVE leaseUntil',
+        ConditionExpression: '#owner = :owner AND #s = :processing',
+        ExpressionAttributeNames: { '#s': 'status', '#owner': 'owner' },
+        ExpressionAttributeValues: {
+          ':done': 'done',
+          ':processing': 'processing',
+          ':owner': owner,
+        },
+      }),
+    );
     return response;
   } catch (error) {
     try {
-      await ddb().send(new DeleteCommand({
-        TableName: tableName(), Key: key,
-        ConditionExpression: '#owner = :owner AND #s = :processing',
-        ExpressionAttributeNames: { '#s': 'status', '#owner': 'owner' },
-        ExpressionAttributeValues: { ':owner': owner, ':processing': 'processing' },
-      }));
+      await ddb().send(
+        new DeleteCommand({
+          TableName: tableName(),
+          Key: key,
+          ConditionExpression: '#owner = :owner AND #s = :processing',
+          ExpressionAttributeNames: { '#s': 'status', '#owner': 'owner' },
+          ExpressionAttributeValues: { ':owner': owner, ':processing': 'processing' },
+        }),
+      );
     } catch (releaseError) {
       if (!isConditionalFailure(releaseError)) log.error('billing.delivery_release_failed');
       // Preserve the processing error; a failed release remains recoverable after the lease.

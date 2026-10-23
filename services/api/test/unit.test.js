@@ -90,11 +90,18 @@ describe('bounded telemetry', () => {
   it('rejects unapproved nested fields and bounds approved string fields', () => {
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     try {
-      log.info('request', { route: 'x'.repeat(500), status: 200, harmless: { secret: 'hidden' }, metadata: 'credential' });
+      log.info('request', {
+        route: 'x'.repeat(500),
+        status: 200,
+        harmless: { secret: 'hidden' },
+        metadata: 'credential',
+      });
       const record = JSON.parse(String(spy.mock.calls[0][0]));
       expect(record.route).toHaveLength(256);
       expect(record).not.toHaveProperty('harmless');
       expect(record).not.toHaveProperty('metadata');
-    } finally { spy.mockRestore(); }
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

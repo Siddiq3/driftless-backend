@@ -1,9 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  GetCommand,
-  QueryCommand,
-  TransactWriteCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { daysBetween, evaluateDay, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
@@ -168,9 +164,7 @@ export async function getChallenges(_e, caller) {
   const ids = (r.Items ?? []).map((i) => String(i.gsi1sk).slice('CHAL#'.length));
   if (ids.length === 0) return json(200, { challenges: [] });
   const got = await batchGet(ids.slice(0, 100).map(metaKey));
-  const challenges = got
-    .map(toSummary)
-    .sort((a, b) => (a.endDate < b.endDate ? 1 : -1));
+  const challenges = got.map(toSummary).sort((a, b) => (a.endDate < b.endDate ? 1 : -1));
   return json(200, { challenges });
 }
 async function memberDays(sub, from, to) {
@@ -258,24 +252,32 @@ export async function getLeaderboard(event, caller) {
     }),
   );
   const subs = (members.Items ?? []).map((m) => m.sub).slice(0, 50);
-  const prof = await batchGet(subs.map((s) => ({ pk: Keys.user(s), sk: Keys.profile })), true);
-  const profiles = new Map(
-    prof.map((p) => [String(p.pk).slice('USER#'.length), p]),
+  const prof = await batchGet(
+    subs.map((s) => ({ pk: Keys.user(s), sk: Keys.profile })),
+    true,
   );
+  const profiles = new Map(prof.map((p) => [String(p.pk).slice('USER#'.length), p]));
   const scored = [];
   // Bound fan-out while avoiding a network round trip per member in series.
   for (let offset = 0; offset < subs.length; offset += 10) {
-    const batch = await Promise.all(subs.slice(offset, offset + 10).map(async (sub) => {
-      const p = profiles.get(sub);
-      if (!p?.handle || !p.consent?.cloudSync || !p.consent.shareWithFriends || meta.startDate > to)
-        return null;
-      const [days, goal] = await Promise.all([
-        memberDays(sub, meta.startDate, to),
-        meta.metric === 'goal_days' ? minutesGoal(sub) : Promise.resolve(null),
-      ]);
-      const score = scoreMember(meta.metric, days, goal);
-      return score === null ? null : { userId: sub, handle: p.handle, score };
-    }));
+    const batch = await Promise.all(
+      subs.slice(offset, offset + 10).map(async (sub) => {
+        const p = profiles.get(sub);
+        if (
+          !p?.handle ||
+          !p.consent?.cloudSync ||
+          !p.consent.shareWithFriends ||
+          meta.startDate > to
+        )
+          return null;
+        const [days, goal] = await Promise.all([
+          memberDays(sub, meta.startDate, to),
+          meta.metric === 'goal_days' ? minutesGoal(sub) : Promise.resolve(null),
+        ]);
+        const score = scoreMember(meta.metric, days, goal);
+        return score === null ? null : { userId: sub, handle: p.handle, score };
+      }),
+    );
     scored.push(...batch.filter((member) => member !== null));
   }
   const hidden = subs.length - scored.length;

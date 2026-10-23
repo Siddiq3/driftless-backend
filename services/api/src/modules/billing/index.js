@@ -202,19 +202,28 @@ export async function postPlayRtdn(event) {
   const push = decode(rawBody(event) || '{}');
   const id = push.message?.messageId;
   const data = push.message?.data;
-  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(id) ||
-      typeof data !== 'string' || !data || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))
+  if (
+    typeof id !== 'string' ||
+    !/^[A-Za-z0-9_-]{1,256}$/.test(id) ||
+    typeof data !== 'string' ||
+    !data ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(data)
+  )
     throw Errors.badRequest('not a Pub/Sub push');
   const n = decode(Buffer.from(data, 'base64').toString('utf8'));
-  const token = n.subscriptionNotification?.purchaseToken ?? n.voidedPurchaseNotification?.purchaseToken;
+  const token =
+    n.subscriptionNotification?.purchaseToken ?? n.voidedPurchaseNotification?.purchaseToken;
   if (token !== undefined && (typeof token !== 'string' || !token || token.length > 4096))
     throw Errors.badRequest('invalid purchase token');
   return withDelivery(id, async () => {
     if (n.packageName && n.packageName !== config.packageName)
       return json(200, { ignored: 'package' });
     if (!token) return json(200, { ignored: 'no token' }); // e.g. testNotification
-    const p = (await ddb().send(new GetCommand({ TableName: tableName(), Key: purchaseKey(token), ConsistentRead: true })))
-      .Item;
+    const p = (
+      await ddb().send(
+        new GetCommand({ TableName: tableName(), Key: purchaseKey(token), ConsistentRead: true }),
+      )
+    ).Item;
     if (!p) return json(200, { ignored: 'unknown token' }); // purchase not yet verified by the app
     if (p.sub === 'deleted') return json(200, { ignored: 'deleted account' });
     if (p.supersededBy) return json(200, { ignored: 'superseded' });
@@ -228,7 +237,7 @@ export async function postPlayRtdn(event) {
       type: n.subscriptionNotification?.notificationType,
       tier: e.tier,
       state: e.state,
-  });
-  return json(200, { applied: e.state });
+    });
+    return json(200, { applied: e.state });
   });
 }

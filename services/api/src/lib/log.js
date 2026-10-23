@@ -3,7 +3,17 @@
  * Callers must never place credentials in approved fields. Never log bodies or headers.
  */
 const FIELDS = new Set([
-  'route', 'status', 'ms', 'reqId', 'err', 'type', 'tier', 'state', 'ok', 'checked', 'changed',
+  'route',
+  'status',
+  'ms',
+  'reqId',
+  'err',
+  'type',
+  'tier',
+  'state',
+  'ok',
+  'checked',
+  'changed',
 ]);
 function write(level, msg, fields) {
   const safe = {};

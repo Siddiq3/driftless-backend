@@ -12,9 +12,16 @@ afterEach(() => vi.restoreAllMocks());
 describe('partial DynamoDB batch responses', () => {
   it('retries only unread keys and preserves strong read settings', async () => {
     const table = process.env.TABLE_NAME;
-    const keys = [{ pk: 'USER#dummy', sk: 'PROFILE' }, { pk: 'USER#other', sk: 'PROFILE' }];
+    const keys = [
+      { pk: 'USER#dummy', sk: 'PROFILE' },
+      { pk: 'USER#other', sk: 'PROFILE' },
+    ];
     const pending = { [table]: { Keys: [keys[1]], ConsistentRead: true } };
-    send.mockResolvedValueOnce({ Responses: { [table]: [{ ...keys[0], rev: 1 }] }, UnprocessedKeys: pending })
+    send
+      .mockResolvedValueOnce({
+        Responses: { [table]: [{ ...keys[0], rev: 1 }] },
+        UnprocessedKeys: pending,
+      })
       .mockResolvedValueOnce({ Responses: { [table]: [{ ...keys[1], rev: 2 }] } });
     expect(await batchGet(keys, true)).toHaveLength(2);
     expect(send.mock.calls[0][0].input.RequestItems[table].ConsistentRead).toBe(true);
@@ -34,7 +41,9 @@ describe('partial DynamoDB batch responses', () => {
   });
   it('rejects incomplete deletion after five responses retaining the same request', async () => {
     send.mockImplementation(async (command) => ({ UnprocessedItems: command.input.RequestItems }));
-    await expect(batchDelete([{ pk: 'USER#dummy', sk: 'PROFILE' }])).rejects.toMatchObject({ status: 503 });
+    await expect(batchDelete([{ pk: 'USER#dummy', sk: 'PROFILE' }])).rejects.toMatchObject({
+      status: 503,
+    });
     expect(send).toHaveBeenCalledTimes(5);
   });
 });

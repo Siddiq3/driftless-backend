@@ -39,11 +39,13 @@ describe('account deletion', () => {
     const a = await user();
     const client = ddb();
     const realSend = client.send.bind(client);
-    const send = vi.spyOn(client, 'send').mockImplementation((command) =>
-      command instanceof BatchWriteCommand
-        ? Promise.resolve({ UnprocessedItems: command.input.RequestItems })
-        : realSend(command),
-    );
+    const send = vi
+      .spyOn(client, 'send')
+      .mockImplementation((command) =>
+        command instanceof BatchWriteCommand
+          ? Promise.resolve({ UnprocessedItems: command.input.RequestItems })
+          : realSend(command),
+      );
     const random = vi.spyOn(Math, 'random').mockReturnValue(0);
     try {
       expect((await call('POST', '/v1/account/delete', a.sub)).statusCode).toBe(503);

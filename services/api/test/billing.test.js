@@ -194,8 +194,17 @@ describe('POST /webhooks/play-rtdn', () => {
     }
   });
   it('returns 400 for malformed authenticated payloads before claiming their ids', async () => {
-    expect((await rtdn('good', { message: { messageId: randomUUID(), data: 'not-base64!' } })).statusCode).toBe(400);
-    expect((await rtdn('good', { message: { messageId: randomUUID(), data: Buffer.from('{').toString('base64') } })).statusCode).toBe(400);
+    expect(
+      (await rtdn('good', { message: { messageId: randomUUID(), data: 'not-base64!' } }))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await rtdn('good', {
+          message: { messageId: randomUUID(), data: Buffer.from('{').toString('base64') },
+        })
+      ).statusCode,
+    ).toBe(400);
   });
   it('requires a valid Google-signed token from the configured push account', async () => {
     expect((await rtdn(null, push({}))).statusCode).toBe(401);
