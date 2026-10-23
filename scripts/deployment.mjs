@@ -3,18 +3,12 @@ import { pathToFileURL } from 'node:url';
 
 export function validateConfig(env) {
   const errors = [];
-  if (!/^\d{12}$/.test(env.AWS_ACCOUNT_ID ?? ''))
-    errors.push('AWS_ACCOUNT_ID must contain 12 digits');
   if (!/^[a-z]{2}(?:-[a-z]+)+-\d$/.test(env.AWS_REGION ?? '')) errors.push('AWS_REGION is invalid');
   if (!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(env.GOOGLE_WEB_CLIENT_ID ?? ''))
     errors.push('GOOGLE_WEB_CLIENT_ID must be your Google Web OAuth client ID');
   if (env.AWS_ROLE_ARN) {
-    if (
-      !new RegExp(`^arn:aws:iam::${env.AWS_ACCOUNT_ID}:role/[A-Za-z0-9_+=,.@/-]+$`).test(
-        env.AWS_ROLE_ARN,
-      )
-    )
-      errors.push('AWS_ROLE_ARN must identify a role in AWS_ACCOUNT_ID');
+    if (!/^arn:aws:iam::\d{12}:role\/[A-Za-z0-9_+=,.@/-]+$/.test(env.AWS_ROLE_ARN))
+      errors.push('AWS_ROLE_ARN must be a valid IAM role ARN');
   } else if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
     errors.push(
       'Set AWS_ROLE_ARN for OIDC, or both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets',

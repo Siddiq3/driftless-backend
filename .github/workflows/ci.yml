@@ -105,7 +105,6 @@ jobs:
       id-token: write
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
-      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
       SLS_TELEMETRY_DISABLED: '1'
@@ -131,7 +130,6 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           role-session-name: driftless-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
-          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
       - name: Configure AWS with deployment keys
         if: ${{ env.AWS_ROLE_ARN == '' }}
         uses: aws-actions/configure-aws-credentials@v4
@@ -140,7 +138,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
-          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
       - name: Guard existing CDK production data
         # A pre-existing CDK stack needs an explicit resource/data migration first.
         run: bash scripts/check-legacy-stack.sh

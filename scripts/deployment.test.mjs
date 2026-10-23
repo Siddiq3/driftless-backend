@@ -3,7 +3,6 @@ import { test } from 'node:test';
 import { apiUrlFromOutputs, smoke, validateConfig } from './deployment.mjs';
 
 const config = {
-  AWS_ACCOUNT_ID: '123456789012',
   AWS_REGION: 'ap-south-1',
   GOOGLE_WEB_CLIENT_ID: 'test-web.apps.googleusercontent.com',
   AWS_ROLE_ARN: 'arn:aws:iam::123456789012:role/driftless-deploy',
@@ -11,7 +10,7 @@ const config = {
 const url = 'https://example123.execute-api.ap-south-1.amazonaws.com';
 const reply = (status, ok) => ({ status, json: async () => ({ ok }) });
 
-test('accepts OIDC or ecommerce-style keys without requiring both', () => {
+test('accepts OIDC or ecommerce-style keys without a separate account ID', () => {
   assert.doesNotThrow(() => validateConfig(config));
   assert.doesNotThrow(() =>
     validateConfig({
@@ -22,15 +21,15 @@ test('accepts OIDC or ecommerce-style keys without requiring both', () => {
     }),
   );
 });
-test('rejects missing settings, incomplete keys and roles belonging to a different account', () => {
-  assert.throws(() => validateConfig({}), /AWS_ACCOUNT_ID/);
+test('rejects missing settings, incomplete keys and malformed role ARNs', () => {
+  assert.throws(() => validateConfig({}), /AWS_REGION/);
   assert.throws(
     () => validateConfig({ ...config, AWS_ROLE_ARN: '', AWS_ACCESS_KEY_ID: 'example' }),
     /both AWS_ACCESS_KEY_ID/,
   );
   assert.throws(
-    () => validateConfig({ ...config, AWS_ACCOUNT_ID: '999999999999' }),
-    /role in AWS_ACCOUNT_ID/,
+    () => validateConfig({ ...config, AWS_ROLE_ARN: 'arn:aws:iam::invalid:role/deploy' }),
+    /valid IAM role ARN/,
   );
   assert.throws(() => validateConfig({ ...config, GOOGLE_WEB_CLIENT_ID: 'wrong' }), /Web OAuth/);
 });

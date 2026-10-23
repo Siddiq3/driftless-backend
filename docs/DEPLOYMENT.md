@@ -12,7 +12,6 @@ Under that environment, add these **variables**:
 
 | Name | Value |
 | --- | --- |
-| `AWS_ACCOUNT_ID` | Your intended 12-digit AWS account ID |
 | `AWS_REGION` | `ap-south-1`, or your selected region |
 | `GOOGLE_WEB_CLIENT_ID` | The Web OAuth client ID ending in `.apps.googleusercontent.com`, matching the Android app |
 
@@ -28,11 +27,11 @@ Add **environment secrets**:
 | `AWS_SECRET_ACCESS_KEY` | Its matching secret access key |
 | `AWS_SESSION_TOKEN` | Only when using temporary session credentials; omit for ordinary IAM access keys |
 
-Leave the `AWS_ROLE_ARN` variable unset. Use a deployment identity with permission to provision the resources in `serverless.yml`. Do not use AWS root access keys. The workflow checks that credentials belong to `AWS_ACCOUNT_ID` before deployment.
+Leave the `AWS_ROLE_ARN` variable unset. Use a deployment identity with permission to provision the resources in `serverless.yml`. Do not use AWS root access keys. The deployment uses the AWS account associated with these credentials.
 
 ### Alternatively: temporary credentials through OIDC
 
-Add the variable `AWS_ROLE_ARN` with an AWS IAM role ARN in the same account. Access-key secrets are then unnecessary. The workflow requests GitHub's OIDC token and assumes this role.
+Add the variable `AWS_ROLE_ARN` with the AWS IAM role ARN for your deployment account. Access-key secrets are then unnecessary. The workflow requests GitHub's OIDC token and assumes this role.
 
 In AWS IAM, add or reuse the OIDC provider `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`. The role's trust policy should restrict the audience and this exact repository/environment, replacing `YOUR_AWS_ACCOUNT_ID`:
 
@@ -105,7 +104,6 @@ Deploying does not implement the pending guest-to-account data migration or cert
 | Failure | Check |
 | --- | --- |
 | Configuration step lists missing settings | Add variables/secrets to `prod`, using the exact names above. Values are not printed. |
-| AWS account mismatch | Correct `AWS_ACCOUNT_ID` or the deployment identity; do not change the expected account just to bypass the check. |
 | OIDC assumption denied | Check the provider, role trust audience, exact repository/environment subject and main-only environment rule. |
 | Deployment AccessDenied | Have the AWS administrator grant provisioning permissions for the resources in `serverless.yml`, including `iam:PassRole`. |
 | Existing CDK stack detected | Follow the migration note above; do not delete the old stack or data to bypass the guard. |
