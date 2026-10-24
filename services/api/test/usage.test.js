@@ -27,7 +27,7 @@ const sync = (sub, days, key = randomUUID()) =>
     }),
   );
 const history = (sub, from, to) =>
-  route(event({ path: '/v1/usage/history', sub, query: { from, to } }));
+  route(event({ path: '/v1/usage/history', sub, query: { from, to, includePersonal: 'true' } }));
 async function userWithSync() {
   const sub = newSub();
   await route(event({ path: '/v1/me', sub }));
@@ -44,6 +44,44 @@ async function userWithSync() {
   return sub;
 }
 describe('POST /v1/usage/sync', () => {
+  it('round-trips personal counts separately from competitive views, with revision and owner isolation', async () => {
+    const sub = await userWithSync();
+    const other = await userWithSync();
+    const row = day('2026-10-17', 1, { personalViews: 73, views: null });
+    const key = randomUUID();
+    expect((await sync(sub, [row], key)).statusCode).toBe(200);
+    expect((await sync(sub, [row], key)).headers['idempotent-replayed']).toBe('true');
+    await sync(sub, [day('2026-10-17', 2, { personalViews: 89 })]);
+    await sync(sub, [row]);
+    const restored = v1.HistoryResponse.parse(
+      bodyOf(await history(sub, '2026-10-17', '2026-10-17')),
+    );
+    expect(restored.days).toEqual([
+      expect.objectContaining({ personalViews: 89, views: null, minutes: 30, rev: 2 }),
+    ]);
+    expect(bodyOf(await history(other, '2026-10-17', '2026-10-17')).days).toEqual([]);
+    // Legacy writes and reads keep working during staged rollout.
+    await sync(sub, [day('2026-10-17', 3, { minutes: 31 })]);
+    expect(bodyOf(await history(sub, '2026-10-17', '2026-10-17')).days[0]).toMatchObject({
+      personalViews: 89,
+      minutes: 31,
+    });
+    const legacy = bodyOf(
+      await route(
+        event({ path: '/v1/usage/history', sub, query: { from: '2026-10-17', to: '2026-10-17' } }),
+      ),
+    );
+    expect(legacy.days[0]).not.toHaveProperty('personalViews');
+  });
+  it('rejects invalid personal counts and personal video counts from iOS', async () => {
+    const sub = await userWithSync();
+    for (const personalViews of [-1, 1.5, 100001]) {
+      expect((await sync(sub, [day('2026-10-17', 1, { personalViews })])).statusCode).toBe(400);
+    }
+    expect(
+      (await sync(sub, [day('2026-10-17', 1, { platform: 'ios', personalViews: 73 })])).statusCode,
+    ).toBe(400);
+  });
   it('requires cloud-sync consent', async () => {
     const sub = newSub();
     await route(event({ path: '/v1/me', sub }));

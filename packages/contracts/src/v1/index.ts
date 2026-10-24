@@ -106,15 +106,22 @@ export const DailyAggregate = z
     deviceId: Uuid,
     views: z.int().min(0).max(5000).nullable(),
     adViews: z.int().min(0).max(5000).nullable(),
+    /** Recorded total for backup/restore and comparisons when separately shared. */
+    personalViews: z.int().min(0).max(100_000).nullable().optional(),
     minutes: z.int().min(0).max(1440).nullable(),
     /** Fraction of the day during which tracking was healthy. */
     coverage: z.number().min(0).max(1),
     rev: Revision,
   })
-  .refine((a) => a.platform === 'android' || (a.views === null && a.adViews === null), {
-    message: 'iOS aggregates cannot carry video counts',
-    path: ['views'],
-  });
+  .refine(
+    (a) =>
+      a.platform === 'android' ||
+      (a.views === null && a.adViews === null && a.personalViews == null),
+    {
+      message: 'iOS aggregates cannot carry video counts',
+      path: ['views'],
+    },
+  );
 export type DailyAggregate = z.infer<typeof DailyAggregate>;
 
 export const UsageSyncRequest = z.strictObject({
@@ -138,7 +145,11 @@ export const UsageSyncResult = z.object({
 export const UsageSyncResponse = z.object({ results: z.array(UsageSyncResult) });
 export type UsageSyncResponse = z.infer<typeof UsageSyncResponse>;
 
-export const HistoryQuery = z.strictObject({ from: LocalDate, to: LocalDate });
+export const HistoryQuery = z.strictObject({
+  from: LocalDate,
+  to: LocalDate,
+  includePersonal: z.enum(['true', 'false']).optional(),
+});
 export const HistoryResponse = z.object({ days: z.array(DailyAggregate) });
 
 /* ───────────── Friends ───────────── */

@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { daysBetween } from '@siddiq3/driftless-contracts/domain';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
@@ -28,14 +28,19 @@ function assertNotFuture(localDate, nowMs) {
  */
 async function applyDay(sub, d, now) {
   const key = { pk: Keys.user(sub), sk: Keys.day(d.localDate, d.deviceId) };
-  const item = { ...key, ...d, ttl: ttlFor(d.localDate), receivedAt: now };
+  const fields = Object.entries({ ...d, ttl: ttlFor(d.localDate), receivedAt: now });
   try {
     await ddb().send(
-      new PutCommand({
+      new UpdateCommand({
         TableName: tableName(),
-        Item: item,
-        ConditionExpression: 'attribute_not_exists(pk) OR rev < :rev',
-        ExpressionAttributeValues: { ':rev': d.rev },
+        Key: key,
+        // An older client can update minutes without deleting a newer client's personal backup.
+        UpdateExpression: 'SET ' + fields.map(([name]) => `#${name} = :${name}`).join(', '),
+        ExpressionAttributeNames: Object.fromEntries(fields.map(([name]) => [`#${name}`, name])),
+        ExpressionAttributeValues: Object.fromEntries(
+          fields.map(([name, value]) => [`:${name}`, value]),
+        ),
+        ConditionExpression: 'attribute_not_exists(pk) OR #rev < :rev',
       }),
     );
     return { localDate: d.localDate, deviceId: d.deviceId, status: 'applied', serverRev: d.rev };
@@ -72,7 +77,11 @@ export async function postUsageSync(event, caller) {
 }
 export async function getUsageHistory(event, caller) {
   const q = event.queryStringParameters ?? {};
-  const { from, to } = validate(v1.HistoryQuery, { from: q.from, to: q.to });
+  const { from, to, includePersonal } = validate(v1.HistoryQuery, {
+    from: q.from,
+    to: q.to,
+    includePersonal: q.includePersonal,
+  });
   const span = daysBetween(from, to);
   if (span < 0) throw Errors.badRequest('from must not be after to');
   if (span + 1 > MAX_HISTORY_DAYS)
@@ -93,8 +102,30 @@ export async function getUsageHistory(event, caller) {
       }),
     );
     for (const it of page.Items ?? []) {
-      const { localDate, tz, platform, deviceId, views, adViews, minutes, coverage, rev } = it;
-      days.push({ localDate, tz, platform, deviceId, views, adViews, minutes, coverage, rev });
+      const {
+        localDate,
+        tz,
+        platform,
+        deviceId,
+        views,
+        adViews,
+        minutes,
+        coverage,
+        rev,
+        personalViews,
+      } = it;
+      days.push({
+        localDate,
+        tz,
+        platform,
+        deviceId,
+        views,
+        adViews,
+        minutes,
+        coverage,
+        rev,
+        ...(includePersonal === 'true' && personalViews !== undefined ? { personalViews } : {}),
+      });
     }
     start = page.LastEvaluatedKey;
   } while (start);

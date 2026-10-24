@@ -13,6 +13,7 @@ import { Errors, HttpError, json, parseBody, validate } from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
 import { loadOrCreateProfile } from './me.js';
 import { batchGet } from '../lib/batch.js';
+import { comparisonCount } from '../lib/comparison-count.js';
 export const MAX_FRIENDS = 200;
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 const INVITE_TTL_SEC = 7 * 86_400;
@@ -79,7 +80,7 @@ async function toFriends(items) {
 export async function getFriends(_e, caller) {
   return json(200, { friends: await toFriends(await listFriendItems(caller.sub)) });
 }
-/** A local-date comparison, never a raw local candidate count or a missing-device zero. */
+/** Compare shared recorded totals; never turn a missing device measurement into zero. */
 async function dailyCount(sub, date) {
   const rows = [];
   let start;
@@ -101,11 +102,12 @@ async function dailyCount(sub, date) {
     start = page.LastEvaluatedKey;
   } while (start);
   const live = rows.filter((row) => row.ttl > Date.now() / 1000);
-  if (!live.length || live.some((row) => row.views === null || row.coverage < 0.8))
+  const counts = live.map(comparisonCount);
+  if (!counts.length || counts.some((count) => count === null))
     return { status: 'unavailable', views: null, updatedAt: null };
   return {
     status: 'eligible',
-    views: live.reduce((sum, row) => sum + row.views, 0),
+    views: counts.reduce((sum, count) => sum + count, 0),
     updatedAt: live
       .map((row) => row.receivedAt)
       .sort()

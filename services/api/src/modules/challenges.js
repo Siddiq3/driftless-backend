@@ -7,9 +7,8 @@ import { Errors, json, parseBody } from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
 import { areFriends } from './friends.js';
 import { batchGet } from '../lib/batch.js';
+import { comparisonCount } from '../lib/comparison-count.js';
 export const MAX_CHALLENGE_DAYS = 31;
-/** Days below this coverage don't count for video scores (T6: plausibility). */
-const MIN_COVERAGE = 0.8;
 const metaKey = (id) => ({ pk: `CHAL#${id}`, sk: 'META' });
 const memberKey = (id, sub) => ({ pk: `CHAL#${id}`, sk: `MEMBER#${sub}` });
 const toSummary = (m) => ({
@@ -190,14 +189,19 @@ async function memberDays(sub, from, to) {
   const byDate = new Map();
   for (const it of rows) {
     const d = it;
+    if (d.ttl != null && d.ttl <= Date.now() / 1000) continue;
+    const count = comparisonCount(d);
     const cur = byDate.get(d.localDate);
-    if (!cur) byDate.set(d.localDate, { ...d });
+    if (!cur) byDate.set(d.localDate, { ...d, comparisonViews: count });
     else
       byDate.set(d.localDate, {
         localDate: d.localDate,
         minutes:
           cur.minutes === null && d.minutes === null ? null : (cur.minutes ?? 0) + (d.minutes ?? 0),
-        views: cur.views === null && d.views === null ? null : (cur.views ?? 0) + (d.views ?? 0),
+        // A partly observed device-day must not appear as a lower, winning count.
+        comparisonViews:
+          cur.comparisonViews === null || count === null ? null : cur.comparisonViews + count,
+        views: null,
         coverage: Math.min(cur.coverage, d.coverage),
       });
   }
@@ -229,8 +233,12 @@ export function scoreMember(metric, days, goalMinutes) {
       : null;
   }
   if (metric === 'fewest_views') {
-    const t = days.filter((d) => d.views !== null && d.coverage >= MIN_COVERAGE);
-    return t.length ? Math.round((t.reduce((n, d) => n + d.views, 0) / t.length) * 10) / 10 : null;
+    const counts = days
+      .map((day) => ('comparisonViews' in day ? day.comparisonViews : comparisonCount(day)))
+      .filter((count) => count !== null);
+    return counts.length
+      ? Math.round((counts.reduce((sum, count) => sum + count, 0) / counts.length) * 10) / 10
+      : null;
   }
   if (goalMinutes === null) return null;
   return days.filter(

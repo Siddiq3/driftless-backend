@@ -49,6 +49,18 @@ describe('TimeZone', () => {
 });
 
 describe('DailyAggregate', () => {
+  it('preserves optional personal counts without changing competitive views', () => {
+    expect(v1.DailyAggregate.parse(day({ views: null, personalViews: 73 }))).toMatchObject({
+      views: null,
+      personalViews: 73,
+    });
+    expect(v1.DailyAggregate.safeParse(day({ personalViews: -1 })).success).toBe(false);
+    expect(
+      v1.DailyAggregate.safeParse(
+        day({ platform: 'ios', views: null, adViews: null, personalViews: 73 }),
+      ).success,
+    ).toBe(false);
+  });
   it('accepts a valid Android day', () => {
     expect(v1.DailyAggregate.safeParse(day()).success).toBe(true);
   });

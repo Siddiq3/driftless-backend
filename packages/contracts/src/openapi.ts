@@ -58,7 +58,8 @@ export const ROUTES: readonly Route[] = [
   {
     method: 'get',
     path: '/v1/usage/history',
-    summary: 'History range',
+    summary: 'History range (opt in to personal recorded counts)',
+    query: v1.HistoryQuery,
     response: v1.HistoryResponse,
   },
   { method: 'get', path: '/v1/friends', summary: 'List friends', response: v1.FriendsResponse },

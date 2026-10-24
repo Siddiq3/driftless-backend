@@ -5,7 +5,8 @@ import { addDays, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { scoreMember } from '../src/modules/challenges.js';
 import { route } from '../src/router.js';
 import { bodyOf, event, newSub } from './helpers.js';
-const call = (method, path, sub, body) => route(event({ method, path, sub, body }));
+const call = (method, path, sub, body, headers) =>
+  route(event({ method, path, sub, body, headers }));
 const today = localDateOf(Date.now(), 'UTC');
 let n = 0;
 /** A signed-up user with a handle; optionally sharing with friends. */
@@ -38,7 +39,14 @@ const friends = async (sub) =>
 describe('daily friend comparisons', () => {
   const daily = (sub, date = today) =>
     route(event({ path: '/v1/friends/daily', sub, query: { date } }));
-  const sync = async (sub, views, coverage = 1, deviceId = randomUUID(), rev = 1) => {
+  const sync = async (
+    sub,
+    views,
+    coverage = 1,
+    deviceId = randomUUID(),
+    rev = 1,
+    personalViews,
+  ) => {
     const r = await route(
       event({
         method: 'POST',
@@ -52,6 +60,7 @@ describe('daily friend comparisons', () => {
               platform: 'android',
               deviceId,
               views,
+              ...(personalViews !== undefined ? { personalViews } : {}),
               adViews: null,
               minutes: 10,
               coverage,
@@ -64,6 +73,32 @@ describe('daily friend comparisons', () => {
     );
     expect(r.statusCode).toBe(200);
   };
+  it('compares recorded totals across devices without double counting approved views or losing zero', async () => {
+    const a = await user(),
+      b = await user();
+    await befriend(a, b);
+    const device = randomUUID();
+    await sync(a.sub, 8, 0.01, device, 1, 73);
+    await sync(a.sub, 8, 0.01, device, 1, 73); // Retry remains one device-day.
+    await sync(a.sub, null, 0.01, randomUUID(), 1, 2);
+    await sync(b.sub, null, 0, randomUUID(), 1, 0);
+    const result = bodyOf(await daily(a.sub));
+    expect(result.self).toMatchObject({ status: 'eligible', views: 75 });
+    expect(result.friends[0].daily).toMatchObject({ status: 'eligible', views: 0 });
+    // Withdrawing sharing still hides a recorded personal total.
+    const me = await call('GET', '/v1/me', b.sub);
+    await call(
+      'PATCH',
+      '/v1/me',
+      b.sub,
+      { consent: { shareWithFriends: false } },
+      { 'if-match': String(bodyOf(me).profile.rev) },
+    );
+    expect(bodyOf(await daily(a.sub)).friends[0].daily).toMatchObject({
+      status: 'private',
+      views: null,
+    });
+  });
   it('compares eligible counts, combines devices, preserves zero and excludes pending/strangers', async () => {
     const a = await user(),
       b = await user(),
@@ -280,6 +315,68 @@ const create = async (sub, over = {}) =>
     ...over,
   });
 describe('challenges & leaderboards', () => {
+  it('ranks shared recorded reel counts, preserves zero, and excludes incomplete device-days', async () => {
+    const a = await user(),
+      b = await user(),
+      privateMember = await user(false);
+    await befriend(a, b);
+    await befriend(a, privateMember);
+    const ch = v1.ChallengeSummary.parse(bodyOf(await create(a.sub, { metric: 'fewest_views' })));
+    await call('POST', `/v1/challenges/${ch.challengeId}/join`, b.sub);
+    await call('POST', `/v1/challenges/${ch.challengeId}/join`, privateMember.sub);
+    const device = randomUUID();
+    const upload = async (
+      sub,
+      personalViews,
+      deviceId = randomUUID(),
+      date = today,
+      views = null,
+    ) => {
+      const response = await route(
+        event({
+          method: 'POST',
+          path: '/v1/usage/sync',
+          sub,
+          body: {
+            days: [
+              {
+                localDate: date,
+                tz: 'UTC',
+                platform: 'android',
+                deviceId,
+                views,
+                personalViews,
+                adViews: null,
+                minutes: 10,
+                coverage: 0.01,
+                rev: 1,
+              },
+            ],
+          },
+          headers: { 'idempotency-key': randomUUID() },
+        }),
+      );
+      expect(response.statusCode).toBe(200);
+    };
+    await upload(a.sub, 73, device, today, 8);
+    await upload(a.sub, 73, device, today, 8); // Same source-device row, not a second copy.
+    await upload(a.sub, 2);
+    await upload(a.sub, 20, randomUUID(), addDays(today, -1));
+    await upload(b.sub, 0);
+    await upload(privateMember.sub, 1);
+    const board = async () =>
+      v1.LeaderboardResponse.parse(
+        bodyOf(await call('GET', `/v1/challenges/${ch.challengeId}/leaderboard`, a.sub)),
+      );
+    const initial = await board();
+    expect(initial.entries.map((entry) => [entry.userId, entry.score])).toEqual([
+      [b.sub, 0],
+      [a.sub, 47.5],
+    ]);
+    expect(initial.hiddenMembers).toBe(1);
+    await upload(a.sub, null); // An unknown device count must not become an artificial zero.
+    expect((await board()).entries.find((entry) => entry.userId === a.sub).score).toBe(20);
+  });
   it('friends join; strangers cannot; full challenges refuse', async () => {
     const a = await user();
     const b = await user();
@@ -370,6 +467,13 @@ describe('scoreMember', () => {
   it('video scores ignore low-coverage and untracked days', () => {
     expect(scoreMember('fewest_views', [d(1, 10), d(1, 2, 0.5), d(1, null)], null)).toBe(10);
     expect(scoreMember('fewest_views', [d(1, null)], null)).toBeNull();
+  });
+  it('video scores prefer recorded totals and retain the legacy coverage fallback', () => {
+    expect(scoreMember('fewest_views', [{ ...d(1, 8, 0.01), personalViews: 73 }], null)).toBe(73);
+    expect(scoreMember('fewest_views', [{ ...d(1, null, 0), personalViews: 0 }], null)).toBe(0);
+    expect(
+      scoreMember('fewest_views', [{ ...d(1, 8, 0.5), personalViews: null }], null),
+    ).toBeNull();
   });
   it('goal days count kept days against the member’s own minutes goal', () => {
     expect(scoreMember('goal_days', [d(10, null), d(50, null), d(29, null)], 30)).toBe(2);
