@@ -1,0 +1,30 @@
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +679
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 679, reused 0, downloaded 170, added 167
+Progress: resolved 679, reused 0, downloaded 376, added 367
+Progress: resolved 679, reused 0, downloaded 626, added 623
+Progress: resolved 679, reused 0, downloaded 679, added 679, done
+
+devDependencies:
++ @eslint/js 10.0.1
++ @types/node 22.20.5
++ eslint 10.13.0
++ prettier 3.8.1
++ serverless 3.40.0
++ turbo 2.11.9
++ typescript 5.9.3
++ typescript-eslint 8.71.2
++ vitest 5.0.5
+
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: aws-sdk@2.1693.0, es5-ext@0.10.64,                  │
+│   esbuild@0.28.2, serverless@3.40.0.                                         │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 4.4s using pnpm v10.28.0

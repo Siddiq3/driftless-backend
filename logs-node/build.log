@@ -1,0 +1,35 @@
+
+> driftless-backend@ build /home/runner/work/driftless-backend/driftless-backend
+> turbo run build
+
+
+Attention:
+Turborepo now collects completely anonymous telemetry regarding usage.
+This information is used to shape the Turborepo roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://turborepo.dev/docs/telemetry
+
+
+   • Packages in scope: @driftless/api, @siddiq3/driftless-contracts
+   • Running build in 2 packages
+   • Remote caching disabled
+
+::group::@siddiq3/driftless-contracts:build
+cache miss, executing aaf8392a80127c69
+
+> @siddiq3/driftless-contracts@0.4.0 build /home/runner/work/driftless-backend/driftless-backend/packages/contracts
+> tsc -p tsconfig.json
+
+::endgroup::
+::group::@driftless/api:build
+cache miss, executing 5a545064fb0591c2
+
+> @driftless/api@0.1.0 build /home/runner/work/driftless-backend/driftless-backend/services/api
+> node build.mjs
+
+::endgroup::
+
+ Tasks:    2 successful, 2 total
+Cached:    0 cached, 2 total
+  Time:    1.707s 
+

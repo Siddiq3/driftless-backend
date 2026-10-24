@@ -1,0 +1,572 @@
+
+   • Packages in scope: @driftless/api, @siddiq3/driftless-contracts
+   • Running test in 2 packages
+   • Remote caching disabled
+
+::group::@siddiq3/driftless-contracts:build
+cache hit, replaying logs aaf8392a80127c69
+
+> @siddiq3/driftless-contracts@0.4.0 build /home/runner/work/driftless-backend/driftless-backend/packages/contracts
+> tsc -p tsconfig.json
+
+::endgroup::
+::group::@siddiq3/driftless-contracts:test
+cache miss, executing c6ba6e5721b6de30
+
+> @siddiq3/driftless-contracts@0.4.0 test /home/runner/work/driftless-backend/driftless-backend/packages/contracts
+> vitest run --coverage
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/home/runner/work/driftless-backend/driftless-backend/packages/contracts[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m test/domain/view-rules.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m test/domain/goals-streaks-brain.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m test/domain/wrapped.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m test/domain/dates.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 312[2mms[22m[39m
+ [32m✓[39m test/contracts.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 245[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m88 passed[39m[22m[90m (88)[39m
+[2m   Start at [22m 15:25:11
+[2m   Duration [22m 691ms[2m (tests 47%, transform 30%, import 16%, worker 8%)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+---------------|---------|----------|---------|---------|-------------------
+File           | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+---------------|---------|----------|---------|---------|-------------------
+All files      |     100 |    97.67 |     100 |     100 |                   
+ brain.ts      |     100 |      100 |     100 |     100 |                   
+ dates.ts      |     100 |    92.59 |     100 |     100 | 25,105            
+ goals.ts      |     100 |      100 |     100 |     100 |                   
+ streaks.ts    |     100 |      100 |     100 |     100 |                   
+ view-rules.ts |     100 |     98.3 |     100 |     100 | 117               
+ wrapped.ts    |     100 |      100 |     100 |     100 |                   
+---------------|---------|----------|---------|---------|-------------------
+::endgroup::
+::group::@driftless/api:test
+cache miss, executing 000fc959384add80
+
+> @driftless/api@0.1.0 test /home/runner/work/driftless-backend/driftless-backend/services/api
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/home/runner/work/driftless-backend/driftless-backend/services/api[39m
+
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":106,"reqId":"7085e26d-afc1-46b6-a550-7ecacd775d2c"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":57,"reqId":"2206ba79-8bcb-4ec7-8df6-70256d5a3485"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":9,"reqId":"6da0d800-2773-435d-a8ad-e5e6f88fbbb8"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":19,"reqId":"a595f2ff-1b50-4be8-a88c-d51470e6b64a"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":88,"reqId":"8c03d255-9a73-442c-926c-2b8c9bd32bba"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":13,"reqId":"a8559e96-be71-4238-aeeb-e93a12d2ec3e"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":24,"reqId":"6bb4e738-388e-4335-a9ab-127ef9a31a10"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":24,"reqId":"00c4192c-1a04-47ad-8f0c-9138f37fe10f"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":19,"reqId":"9dc99c53-1ac7-4bea-958b-40a25cda9a74"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":22,"reqId":"e3b1aa2e-7e6b-4d56-82b7-079cf264a292"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":28,"reqId":"1af05c12-1b71-42d2-93c5-2f6453e03ede"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"afff615e-495e-4554-ad20-d7736e1dacdf"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":14,"reqId":"51076825-fe0e-4531-a40f-864390d69073"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":17,"reqId":"97a7120b-92b6-4254-a526-2a66d4f21727"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":8,"reqId":"d66bb1bc-27a8-4306-b728-9a6c67d729f9"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":15,"reqId":"16911163-744c-4514-a74a-d96399f70464"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":8,"reqId":"01a95ebb-0a20-43c0-a4d5-089019f88401"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":16,"reqId":"9b0c865d-1a21-4072-b1ba-38d3f5f93e79"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":15,"reqId":"5256e8e7-4ea1-4ed0-a9e5-3dfb52f78e7f"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":15,"reqId":"c4662659-2111-4094-a110-3c6b9824b0d3"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":7,"reqId":"f71f23e8-e9b9-4c5e-84dd-7517ffeb655e"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":11,"reqId":"43438d8b-9be5-4932-adb3-c733af45f3c7"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":7,"reqId":"a01731f4-cd62-4d30-9f03-cbc6d08dc02c"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":13,"reqId":"b9275d70-2163-49bf-91f4-11fcc18be2e2"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":21,"reqId":"73a24f1c-308e-472f-be9a-c9e0447a5178"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":7,"reqId":"7f285c68-66be-4f69-ad9c-d5cb7872d05a"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":22,"reqId":"5f789285-62a2-462f-858a-bc0948227ede"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":6,"reqId":"88d3cba1-2eb4-4dcf-aeaf-214b98aa0570"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":20,"reqId":"758625f4-038c-4817-ac2b-2cf19a254566"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":13,"reqId":"07097b2c-2bbd-4ca0-87f5-08d4a44cbb17"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":11,"reqId":"c65348b9-1b54-4f1d-9cf2-eebef1ee0a48"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":11,"reqId":"135931de-5e22-4d16-838f-a6887838a747"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":11,"reqId":"6b2eba50-c1c7-4a31-a527-e9abbf5d27db"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":11,"reqId":"37ae79e1-6bf8-4ebe-be80-d3c2056c99ad"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":12,"reqId":"9197bc0c-a370-4437-aebd-6b536997e6f2"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":12,"reqId":"088a8fa8-af52-404b-a4f9-28ea9b620cef"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":13,"reqId":"9fdcd26b-9882-4886-87a6-a4daed0c79f6"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":6,"reqId":"b020fa3a-cfe3-4d8b-a7c8-99270e969bc7"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":9,"reqId":"f702abe1-00bc-41d3-92b2-f29e4dc876c5"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"fbc2a8c4-0818-4d1e-bf6a-21c9a48b98f1"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":10,"reqId":"1f72f403-c174-450d-a8cf-072ac1f09bf4"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":23,"reqId":"8714dcd4-a7cb-435f-997f-eb0752b12da5"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":5,"reqId":"302347cc-4638-4e5c-b0d9-b304e57adac8"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":10,"reqId":"c79a1390-3773-4d35-99ea-b3d37de4766f"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":10,"reqId":"4e275988-683c-4c97-88ee-9eb13bf0e831"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":403,"ms":2,"reqId":"935de4fa-1ec4-4085-aee5-4670e5aa3ddd"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":8,"reqId":"8a9eaf8b-b55f-4280-9d4a-9b8596af0b99"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":16,"reqId":"3f18ae66-c6c1-4d23-bdb9-3324a9ec0e3c"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":11,"reqId":"cde291fd-1d24-42e7-a477-6dbf20460a9a"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":12,"reqId":"4dab856c-f68e-408a-af9d-aeba46f5ca77"}
+{"level":"info","msg":"request","route":"POST /v1/friends/remove","status":200,"ms":11,"reqId":"f5ee660d-a732-4477-8493-44f95780b973"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":13,"reqId":"5f5f8652-31b9-40c4-acc9-0ff5fd6b5dd9"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"9990b13b-5dcc-4bbc-be22-382de0f29e9e"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":10,"reqId":"65102b7f-4c9f-4960-a9b5-b5cd518e5124"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"71a797b1-37f5-45b5-afde-599a7f1174fa"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":9,"reqId":"5c33d3b4-63ff-49fa-9e81-aba478ac759f"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":19,"reqId":"03eb0960-7daa-4735-a53c-51ff5397fe8f"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":6,"reqId":"f57b5c07-9e4f-4788-b2e0-dbaf630a89ee"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":16,"reqId":"f5cbb163-f240-4db1-8e10-bcbf63da9e49"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":10,"reqId":"823c4733-9227-4c82-bfec-499ff53f004e"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":14,"reqId":"f5943c02-f2f5-460e-97e9-96dc1e9f58a5"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":13,"reqId":"819a577e-167c-4172-ae5b-c251b140488a"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":16,"reqId":"cc6c4969-7713-4d00-9f4e-568fef55e3cd"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":13,"reqId":"ef97d437-510f-4012-8809-c4b26698af7b"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":200,"ms":16,"reqId":"62ad705b-1781-428c-a511-9061bd97d662"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":401,"ms":0,"reqId":"9ab6ecbe-1253-4b95-b769-a86c68f31470"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"85beb647-b01b-496a-be35-4818fc984d9c"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":11,"reqId":"2473d61a-2366-43e9-b7a9-a33168562c12"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":400,"ms":1,"reqId":"2728feb4-5b45-48be-8264-372441f83e33"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":400,"ms":0,"reqId":"04321ff3-efd4-4b6e-b93a-bffa72921655"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":400,"ms":0,"reqId":"ddd07726-3efd-4f13-bb2f-2866458c5e0a"}
+{"level":"info","msg":"request","route":"GET /v1/friends/daily","status":400,"ms":0,"reqId":"d9795728-10d7-48ee-aeed-27fff68fe469"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"c4df19a4-979e-4813-a54c-68b26b969c73"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":8,"reqId":"4b559641-1031-4892-a27f-a493b5e774fd"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":7,"reqId":"4c8940b2-e869-4243-8ffe-77ae3d1aab12"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":12,"reqId":"97c4982f-c452-4911-b5f7-b06324ffb89c"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":17,"reqId":"379ec4bb-01fe-4822-8eea-52b4f586888f"}
+{"level":"info","msg":"request","route":"GET /v1/friends","status":200,"ms":4,"reqId":"5c8f9957-ef2f-421d-89e2-f000a772433c"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":7,"reqId":"6cc366ce-d49f-4938-979f-9fcf27cc771c"}
+{"level":"info","msg":"request","route":"GET /v1/friends","status":200,"ms":5,"reqId":"fadf1461-75a1-4ca7-9d4b-febb1a1389c2"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"224b7ece-a5af-4815-b974-edd9d11db880"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":9,"reqId":"173f04bc-29cb-466b-ad6a-c2372c360025"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"9c7a7a65-e5bd-4691-84fc-64a2215460e0"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":8,"reqId":"4946d46e-ab69-4fef-b86b-104b164d298e"}
+{"level":"info","msg":"request","route":"POST /v1/friends/invites","status":200,"ms":7,"reqId":"e1f84b1f-a93e-4ec0-87a1-0bcc57dcc189"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":12,"reqId":"b0cb1322-34de-492e-b043-bb56a5872e16"}
+{"level":"info","msg":"request","route":"GET /v1/friends","status":200,"ms":3,"reqId":"8d9ceb04-8893-4a4b-93dc-97674f4e8e68"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"72bf6429-2a6a-4e78-b113-8cdd7717c848"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":7,"reqId":"1d6c4dd2-503c-4f00-9bbe-23a36e287e0b"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"08419ed0-2339-49e4-895e-5de51999b4cf"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":9,"reqId":"3cd881a7-1ddb-4a80-b18c-7af639b93afd"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":14,"reqId":"8c52f06c-7c76-413e-9dbb-c0d8ba5b7a22"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":16,"reqId":"451fdcb1-22ec-4203-b920-c16aa66c7bf9"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"00b3aa4e-3925-4373-b3eb-8191aaaee482"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":9,"reqId":"4c4cdd08-36a2-49e5-b747-079e969cb2dc"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"f71951aa-5052-4dfc-a803-ae49cfcb22fd"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"386600c7-dc50-4560-a69c-2f9a3ce6f848"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":400,"ms":5,"reqId":"99084be2-7ade-4f07-b137-f4c42294dec0"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"ccc9509d-fdb8-4041-8cfd-1f7a1a06b21b"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"ec86cc57-a8cf-4027-aa66-ff140f5f3bfa"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":409,"ms":2,"reqId":"4618ed8f-1f46-4dd3-a590-1fa30be142b7"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":12,"reqId":"c7f8e6e8-e7da-498f-8458-6138e0607b71"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":409,"ms":6,"reqId":"8fd42085-c46f-406d-9784-7bfda3b2d08b"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"831284f3-ff82-447e-9f4d-a37ceaba5a7d"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"9bfc9623-ed5d-4246-8a26-37fe9356e998"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":8,"reqId":"41f21eb7-7c67-4b91-a5ee-85eb040e304f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"db5ba6fc-c501-4915-8c13-857d427a6e18"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":7,"reqId":"df7ea8be-1b06-47b0-ad11-e17b8d48af94"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":12,"reqId":"3319d9d8-4bad-4dd8-99db-929a5097112c"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":404,"ms":8,"reqId":"9263b999-7462-405d-b7c0-8ee63b1686c9"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":3,"reqId":"3b2dd426-5558-4f84-9433-a622820c9ade"}
+{"level":"info","msg":"request","route":"GET /v1/friends","status":200,"ms":1,"reqId":"9b6f54c7-3464-4eda-a24f-e36270ff4234"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":12,"reqId":"b86f1982-310c-4eb3-91cf-ea7ae086c646"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":4,"reqId":"5a4b134c-671f-41b3-8ae0-162b908a769a"}
+{"level":"info","msg":"request","route":"POST /v1/friends/remove","status":200,"ms":3,"reqId":"4301fdf8-22ed-4e57-a369-dd1ec64f4d63"}
+{"level":"info","msg":"request","route":"GET /v1/friends","status":200,"ms":1,"reqId":"03a3a445-5a76-4f2a-ba12-2662f2726620"}
+{"level":"info","msg":"request","route":"GET /v1/friends","status":200,"ms":1,"reqId":"58eef5fd-8fea-4dd6-8029-e162c5108d29"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"1619cb79-d4bd-429e-bae3-e01aac871a72"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"4db20b71-3971-45b8-bcbb-7ee9a96c6fdc"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"1651bbbc-4eca-4a3a-8d2a-04c96e4493e8"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"15801aba-783b-4b4b-9cf2-c6bb8dc4b8cb"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":5,"reqId":"38f36733-c2ca-4c79-b111-bd738987d470"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":5,"reqId":"b3e80668-1871-49cc-a175-e5c89b7fcc1f"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":8,"reqId":"c4ecb07f-23a5-49a8-b8dc-3434c6f228a5"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":5,"reqId":"6dfc4d1b-9d89-4220-95de-ece4f512335d"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":3,"reqId":"521a7f7f-0bee-477d-9793-25b8b6734f90"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"bc6f8687-b035-406b-9912-4a2e74f35747"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"beab86d7-9996-43a7-bbc8-8997006be66d"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":3,"reqId":"1f2b455c-a79f-4c1e-a585-3541251a9f04"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"aa2234f2-b646-4734-a651-ec88fbc50ed0"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":3,"reqId":"aa691aa8-b2e8-4621-b3d7-771ab7a4d880"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"06044308-3cf2-4af2-8e96-1922985f2e96"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"2039f43a-39b0-4e6d-9b5d-fc52efdc8cf0"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":3,"reqId":"71602eba-12ea-4862-8ba7-a88a07483a1b"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"fe0037f8-27b7-40ec-8662-ed6b54d11635"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"4168b7d4-aa90-42ce-9f30-1b34fb694cd8"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":4,"reqId":"4de85407-b40d-468c-9a3e-1db24279e924"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":3,"reqId":"222ad37c-be93-4cbc-b969-8b3475e65491"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":404,"ms":3,"reqId":"f960dad8-cbc8-4d3d-ab31-68c6a6f6db6b"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":429,"ms":2,"reqId":"f1878c3f-ae1a-402c-bf44-6a720c3faa1f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"18215c01-6e97-4bf9-b46a-4bd6823122ca"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"8fd0e306-ba43-4aaa-adff-3a71a7c1c0a5"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"3d50ed89-8bb4-4fc6-a3ec-92e9dacaecb5"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"e202a483-516c-4a24-88c5-06e1656d85e9"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"a6f14905-a505-4957-a5ef-c04dd8fa03ac"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"29dd73f7-63a0-45cd-b2f2-5207acd68687"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":9,"reqId":"3fa6d3d4-254e-46e9-a178-2286885634c0"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":3,"reqId":"e694d8e9-e3f7-455a-9112-23055a33fa94"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":15,"reqId":"34923aad-157f-4773-958d-2d55fb3b5b0d"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":4,"reqId":"bb153423-fd9a-4a4e-a218-443370d365fd"}
+{"level":"info","msg":"request","route":"POST /v1/challenges","status":200,"ms":6,"reqId":"0d1fba49-9e56-4552-9288-e0757b784375"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":7,"reqId":"02506b17-cb59-4a87-9a75-cfebf7f00765"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":6,"reqId":"a932ccba-9778-40ba-9833-5b6c72083467"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":7,"reqId":"89e576e9-d021-473e-b399-3fc8d395c3f5"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":8,"reqId":"497482ce-c5ef-4754-801d-05c66ad96b19"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"bbc16605-fae5-434c-9ad3-be2c9840575d"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":5,"reqId":"a30fc825-a09e-4c75-b9ba-f78d749853cf"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":9,"reqId":"78348d52-40c3-4df8-877c-852a9f1c443c"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"b3e92ce4-ef34-4aed-b173-4915952713af"}
+{"level":"info","msg":"request","route":"GET /v1/challenges/{id}/leaderboard","status":200,"ms":9,"reqId":"3a5125ce-2832-4f71-bbd7-0d6c3ba26431"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"2d1f60f5-9477-427f-8fcd-04e51b83617b"}
+{"level":"info","msg":"request","route":"GET /v1/challenges/{id}/leaderboard","status":200,"ms":8,"reqId":"31a811c5-00f5-4fd1-b4d0-4491c4ccf57c"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"09ad0e7e-ba1d-473f-b100-121e43dbcdd4"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"734a59cb-eeab-456b-bbf6-878c1d7f7d73"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"307b297d-d05b-4154-b9e3-203fe317a7ea"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"f98dc2a6-ff16-4bd3-8f8e-6952bdcb51cb"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"86b99ed3-314f-4fe1-987d-ccfb4769f005"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"f1320f06-6d17-4bd1-8bdb-ce80e0232ae6"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"1fe453e6-ee23-4a1a-953a-ca2d5201492a"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"587cff3c-a2fb-4d63-be0c-cd3d410b8ac8"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":10,"reqId":"e970fe7a-8931-435a-9a09-0b62a9d263d6"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":3,"reqId":"ce141eba-7069-4e92-bf6d-313d0936f7fb"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":10,"reqId":"449f901a-e3ac-4b93-b2a0-6f8181051263"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":4,"reqId":"5142ed63-05de-48b3-bc84-b9c77145a35d"}
+{"level":"info","msg":"request","route":"POST /v1/challenges","status":200,"ms":5,"reqId":"7598a113-d770-4951-a46a-4ead7f14f4c9"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":404,"ms":5,"reqId":"d89bcc14-646c-4fa8-964d-f70ccdaa4529"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":7,"reqId":"ec8afe4e-19c3-4022-82c1-15dabfb3e2e1"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":409,"ms":6,"reqId":"664bcbb1-6567-4ffa-85f8-279a296b7b4c"}
+{"level":"info","msg":"request","route":"GET /v1/challenges","status":200,"ms":3,"reqId":"16392c99-f104-4fe4-ade4-9afab40c00cd"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"9df21c5b-7aff-4682-aa84-32e3079dd6ff"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"41f89f0d-6b74-4dc7-bd6e-debca1127358"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"f0622a4a-d207-4a26-90e2-5aa30f2f6e1b"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"6c7874cc-0d86-443b-8e58-3d603a5b1c86"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"1b37a794-9efd-4775-8b98-3b91abb75599"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"fa1cc676-9d95-4f55-a648-4666e384263f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"30012a30-0416-4bee-b1c3-cc3871c4fc28"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"906931da-f1f9-4797-942a-8eb5b129d22a"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":13,"reqId":"5fc091ea-5ab6-4151-b822-3b216b76d55d"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":3,"reqId":"99c05b36-c09d-44fd-8676-fa5aab1e2a6b"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":10,"reqId":"55c96067-3c46-4932-9678-6b271551182d"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":3,"reqId":"b6371854-b3b1-4e41-a380-8c3c91fd19f1"}
+{"level":"info","msg":"request","route":"POST /v1/challenges","status":200,"ms":5,"reqId":"d232888e-38f2-4083-84f3-fe706b8ef425"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":6,"reqId":"ebadc990-733e-442a-a13e-004c9773fcb9"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":6,"reqId":"3f8acde4-4d45-4b8d-a48d-f3616200a64f"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":10,"reqId":"801be699-6156-4b79-9134-a113c2627f7c"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":9,"reqId":"47eaa7fc-a8ef-4a97-85bb-59cf05aaa264"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"a3347997-6342-4534-aa56-222bb961d91e"}
+{"level":"info","msg":"request","route":"GET /v1/challenges/{id}/leaderboard","status":200,"ms":8,"reqId":"b938aa55-4489-493a-a9a2-4a97ae45aa9a"}
+{"level":"info","msg":"request","route":"GET /v1/challenges/{id}/leaderboard","status":404,"ms":1,"reqId":"323706ed-93b9-4fe0-80fe-4f7375a74984"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"1849d317-a2cd-4b57-bd9c-ca077ebe0b73"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"f7acd69c-c832-4b47-92c9-7c8bdfa83bc0"}
+{"level":"info","msg":"request","route":"POST /v1/challenges","status":400,"ms":2,"reqId":"be2e5367-637a-43dc-bd66-35c3649a1ffd"}
+{"level":"info","msg":"request","route":"POST /v1/challenges","status":400,"ms":2,"reqId":"dcebce3a-e8ca-46aa-90f4-77724af06f42"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":404,"ms":0,"reqId":"d137a4de-8d07-4e9a-8289-7b10880182ac"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"092c2665-7852-48c1-9df9-0127c1b93c99"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"ad752c1d-f9b4-4ca6-aef0-1f2dcf66a723"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"3a3e6935-cf3c-4f55-bb5a-ffbd3f3562ff"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":7,"reqId":"4894ebbb-a4f8-4e19-8569-ca1f683a6e47"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":13,"reqId":"3c547651-738c-4aa1-8b5a-8fbfb211b5c6"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":4,"reqId":"b738c4c5-76a6-4fad-a911-1f577463c240"}
+{"level":"info","msg":"request","route":"POST /v1/challenges","status":200,"ms":6,"reqId":"9938ebd1-7b90-4bab-803f-c0a7419de4a3"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":7,"reqId":"82b4424d-26ad-4469-b010-2dfa745be150"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/leave","status":200,"ms":4,"reqId":"b88a4355-45a9-42ed-960f-95dd4c1405fd"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/leave","status":404,"ms":4,"reqId":"baea2c80-0a92-4184-a12f-d31100a55e98"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":6,"reqId":"27fc9780-707b-44f5-b3d1-7e99d29a7256"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"058e25ab-cf37-4662-89c0-ecbc95bc4520"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"c7d27030-f9ea-44e6-a5d7-92d01c026b52"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"0d2afab8-4f02-44fa-9200-f42a53fb885b"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"000017f8-57ac-4f0a-8d0f-5528137f459b"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":10,"reqId":"457552c5-2fd6-4064-9959-5529cfdaf114"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":5,"reqId":"26d249a2-4902-41dd-965f-1c34749983d0"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":6,"reqId":"89d96866-c4e9-47a4-af24-7e06b4c79cb1"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":7,"reqId":"32409ebc-553d-4571-bf04-1b6fa3ba45f6"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":7,"reqId":"c86c35f9-1c71-49a4-9cda-35a4c349956d"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":8,"reqId":"e22cba86-fb1c-4b36-8cab-ecc1cdbb947a"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":4,"reqId":"2804cbdc-b289-4ac6-ba50-1d35bc61af14"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":8,"reqId":"8f94ddeb-efcb-48aa-be67-304db64acb1f"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":8,"reqId":"06b807b5-d8de-460b-be6d-162bca353363"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":5,"reqId":"57a1e336-e021-421d-b6f9-0dffbb35c4b4"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":409,"ms":3,"reqId":"870b87fb-246a-410c-964e-0686d9be47a7"}
+{"level":"info","msg":"request","route":"DELETE /v1/devices/{id}","status":404,"ms":4,"reqId":"944e3d05-323b-4993-907b-11508bff32b0"}
+{"level":"info","msg":"request","route":"DELETE /v1/devices/{id}","status":200,"ms":2,"reqId":"f87fe1e6-fd41-46a0-aacf-259ab0594281"}
+ [32m✓[39m test/social.test.js [2m([22m[2m20 tests[22m[2m)[22m[33m 1977[2mms[22m[39m
+   [32m✓[39m daily friend comparisons [2m(5)[22m
+     [33m[2m✓[22m[39m compares recorded totals across devices without double counting approved views or losing zero[33m 450[2mms[22m[39m
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":28,"reqId":"a2ce5b2f-6404-4f38-8693-0022b251764f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":6,"reqId":"ec6b46c8-134c-464b-bd22-b5f0f7cf1d3d"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":403,"ms":0,"reqId":"b4681738-319e-4847-bf76-49a0d97ce36f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"9a1b2d56-109e-4e95-b3d5-9560cd32430b"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":5,"reqId":"19a2123a-35b8-4b82-81bd-cf7c6e8e5f5f"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":409,"ms":3,"reqId":"dedc8ac4-e483-4e05-9cec-fcb8ec1c5e3e"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":404,"ms":0,"reqId":"881766f5-de64-47af-9a2b-fdc2a0beaa12"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":400,"ms":0,"reqId":"cf798d83-1db4-481a-b6f5-e4163f3f0ca4"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":400,"ms":0,"reqId":"ddcbc3f7-7bd7-4523-b21f-643035563a3e"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":8,"reqId":"174f9f55-49ed-4997-bd3b-f2918d62289d"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"b209fdf8-3d27-4b5b-b8e8-2dbc5f6a5f5c"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":400,"ms":1,"reqId":"6a3353b4-d852-4c5a-9b48-d92fbe1b2a0f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"0afe6010-8685-40ca-a346-bc6f2013f713"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":6,"reqId":"21bb342e-7234-4327-a7c0-5bf6d831b405"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":500,"ms":7,"reqId":"bf68c189-ea87-4f67-9193-9761e907270e"}
+[90mstderr[2m | test/billing.test.js[2m > [22m[2mPOST /webhooks/play-rtdn[2m > [22m[2mretries the same message after a transient Play failure
+[22m[39m{"level":"error","msg":"unhandled","route":"POST /webhooks/play-rtdn","err":"Error"}
+
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"b59566ca-9880-4325-b2f2-724277b0b19c"}
+{"level":"info","msg":"billing.rtdn","type":5,"tier":"free","state":"on_hold"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":9,"reqId":"f136f4a9-6041-49b4-8e78-2ccc3ed4abff"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"eac48a02-32dd-43b6-8739-bd45d6e43f17"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":400,"ms":0,"reqId":"563f3cd0-e150-4b90-90fe-ff10a8dfc944"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":400,"ms":0,"reqId":"3b7145c1-5389-4ffe-80bc-a94dc218b023"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":401,"ms":0,"reqId":"ba018fde-96c7-4706-84b2-b79b14f2c1a1"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":401,"ms":0,"reqId":"83b6868a-356b-4398-94c4-0566a6048cf7"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":403,"ms":0,"reqId":"f9bc1573-56ea-401e-8e38-4b5303c1f354"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":5,"reqId":"abf2a55c-bb37-4f08-9e36-a8a6a5e899c0"}
+{"level":"info","msg":"billing.voided","type":1}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":6,"reqId":"83e3318d-95c5-44a9-ae73-e58ff576eb34"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"f4b4edad-39cb-4ffa-ae87-77f6f50489a2"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":4,"reqId":"288c928b-f8cb-4625-af31-b7d7a340f771"}
+{"level":"info","msg":"billing.rtdn","type":5,"tier":"free","state":"on_hold"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":10,"reqId":"efcd1f03-ab3f-467a-a001-65524bf25327"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"c7bfbd00-deec-4f90-ad61-916dc33c2605"}
+{"level":"info","msg":"billing.rtdn","type":1,"tier":"pro","state":"active"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":6,"reqId":"09af4988-ef1f-439d-bdee-49449d272bfa"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"09017f1a-0d64-4c98-be54-ac67e2fbd8aa"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":5,"reqId":"be54a263-74e4-4b8b-b6d2-b986d502dd68"}
+{"level":"info","msg":"billing.voided","type":1}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":6,"reqId":"88eb2fc1-3a15-420e-9166-fd62a7a0167a"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":3,"reqId":"56f74dbc-fc44-4a00-b7a9-00db02cb6778"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":5,"reqId":"7aaedb0e-dc2c-42d4-b219-7ef412801a8f"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":7,"reqId":"29416970-11a3-45b9-86fb-fe1b66ff6319"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":4,"reqId":"1b8b5850-388a-41b5-aa5d-4cba71ded5a4"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"02705757-1b75-475d-aaf4-fd141fb90d67"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":3,"reqId":"65c9fcbf-4507-4255-93ba-1045c879db00"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":4,"reqId":"6b7a494b-5ce2-4240-a18f-b05eb6716b48"}
+{"level":"info","msg":"request","route":"POST /webhooks/play-rtdn","status":200,"ms":5,"reqId":"298b5e17-4f7e-4cf2-9518-b278ff6480de"}
+{"level":"info","msg":"request","route":"POST /v1/billing/play/verify","status":200,"ms":7,"reqId":"452c67d6-686c-4e32-b011-220956480fb4"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"f750cae9-47bf-47b6-9379-3757766e320f"}
+{"level":"info","msg":"billing.reconcile","checked":1,"changed":1}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":1,"reqId":"97851433-820d-43a4-b16c-9be6b9c56aec"}
+ [32m✓[39m test/billing.test.js [2m([22m[2m25 tests[22m[2m)[22m[32m 276[2mms[22m[39m
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":28,"reqId":"04cb29cb-a293-4f61-b97e-34cd3aef4e95"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":10,"reqId":"095126b2-9912-49c1-8b4c-e860eab43d39"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"0e4267c8-738e-438e-bda8-650837d10759"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"aa6eafc0-8900-433f-8087-a11804e1f138"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":25,"reqId":"6be90d09-a4e4-48d3-aeb7-fa8b7d72c96f"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"300b57ac-170d-4861-a448-4bad9e550eb5"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":7,"reqId":"0b5dc0b6-f240-41d5-8845-7c5ad83861e4"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":9,"reqId":"9cda054d-84e5-4dce-8c57-9b8f5b861722"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":4,"reqId":"326b4b5a-7a0c-48ef-8760-b3b262d86a5c"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":2,"reqId":"c41c893f-ed6c-483f-a890-e6f86b6df819"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":8,"reqId":"0aab93b3-d57e-4c02-909a-892bcbd5d13a"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":1,"reqId":"27761ad9-0c13-450c-88c7-4bde1a3d3ccf"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":2,"reqId":"3052dafd-d8f0-4ffd-88d0-b844bd17d087"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"fc0e6b57-73ab-488c-ad82-8bb5c62d579a"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"0145accb-499e-40aa-8f33-da2725b6ac86"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":1,"reqId":"719a4f49-65b1-4341-adff-cccac1a8b951"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":1,"reqId":"aac25d87-5605-4de4-9f26-7e8294b5df1f"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":0,"reqId":"d42477f4-7658-4ebf-89b5-85441289274d"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":1,"reqId":"1dae2787-8a78-45f4-a72b-1b6d477a10bd"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"79375c47-6b6c-4648-aec1-9efdc97df768"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":403,"ms":5,"reqId":"bc4488c3-7fdc-4402-b538-6634001d9f48"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"41ad23c9-cb82-4e60-a9bd-d0da1f17327d"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"41f1ea35-ff70-405f-bf1c-0fc1cde1fc6b"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":8,"reqId":"06814497-b3de-4367-8a24-5e3e67f96b03"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"156dba97-8a62-4cf5-b4e9-d64da2b99a09"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"e05e949a-9899-4a92-9425-a5b7091cb20b"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":8,"reqId":"22cf18ef-fbfd-456c-8173-88ce849ea739"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":9,"reqId":"47ae8ede-7580-451c-8250-056df2a36125"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":7,"reqId":"ba87106b-54af-4c04-be67-8c89959f70d5"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"fa64373e-d5e4-4579-b9b5-27bd76fe02fe"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":2,"reqId":"3fbd926f-d10d-40de-98da-168b1c3d5d4b"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"f5e526bb-c3a8-42a3-b2e4-8f64e6b5a67f"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":4,"reqId":"c86a52d1-140c-447f-8ee9-7b34e0c68e68"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"fff2cd77-15e1-4138-b9d9-d88549b77b40"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":3,"reqId":"6915dad2-7a6a-4715-8d1e-2f6458860a7f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"773cdbd7-a9c4-4c3d-acb6-6835a24c14b6"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"faf4f47c-18dc-4c64-b3c8-a3d588c1f362"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":9,"reqId":"531854c9-d16e-4d91-b2df-0ca4c913b376"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":2,"reqId":"84511d56-9f28-4c94-88a4-598a7ae3bc06"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"32209d9d-54d6-463d-9dac-99aa59df0557"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"da79dea8-01da-4087-becd-9b0963f6662a"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":4,"reqId":"528c52ea-7b91-4e86-bfe7-23acc27b29b6"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":0,"reqId":"cf7c75a7-5441-4533-b8d2-70796427b79b"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":1,"reqId":"4139afcd-1957-4a60-a153-55364b271216"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":0,"reqId":"45947dbb-25bd-4b8d-80aa-0c9383f7b112"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"10ac38b6-8119-4d04-b335-329bfd726e79"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"0689eb3e-1cd5-4d09-a9f6-50d14599f01f"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":428,"ms":1,"reqId":"d4cd3e92-fbb2-4b06-a3ae-c675fa43b748"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"17e461bc-d30e-4f7e-b71b-cc4129c2d899"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"01cd3319-ffbc-41e7-bebc-143f25085f30"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"723e8021-8b0a-428b-8fcb-97fb1f625aa0"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":7,"reqId":"cf2072a8-4413-4e7e-8717-3bbb7f281424"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"b71388ea-ad9f-4044-bf7e-b74e65e56713"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":2,"reqId":"6cbd1a75-4762-4b67-9773-19c958ecb5bc"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"ecda4977-3748-4b8e-9bf1-49fcbd407427"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":4,"reqId":"b296ed40-4b72-4b36-a62f-31436a44728d"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":400,"ms":0,"reqId":"102820e4-6e6f-42bc-a8ac-3dc1c8dbc07d"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"1ec8a483-0797-4d49-8d7b-84299d14999e"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"bb9d8bd4-4920-4aab-8b09-19c58304f113"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":12,"reqId":"eb392b20-1102-466c-8ab8-3113dbaa0b6a"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":2,"reqId":"6a90ff7a-d56c-4ea0-9294-ca8b48aa0371"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"077bdcba-39f0-4263-b8a2-07d759fe8153"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"882f2a25-a978-4034-a8bb-20ba56a48214"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":400,"ms":0,"reqId":"18bd3f13-7c73-458b-a111-7570663cd316"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":400,"ms":0,"reqId":"1c924647-cfa8-4a0d-bd39-11e950f40dc8"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":400,"ms":0,"reqId":"536e0ece-1710-487f-bb00-4918c41cfb20"}
+{"level":"info","msg":"request","route":"GET /v1/usage/history","status":200,"ms":1,"reqId":"d995169c-1270-41b7-b81e-21fd16511ee8"}
+ [32m✓[39m test/usage.test.js [2m([22m[2m14 tests[22m[2m)[22m[33m 328[2mms[22m[39m
+{"level":"info","msg":"request","route":"GET /v1/me","status":401,"ms":0,"reqId":"3f6e1851-92f4-433c-aa07-957d3ff50c18"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":401,"ms":0,"reqId":"5137e4d9-afc2-4e92-9b2e-1ff020db1809"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":401,"ms":0,"reqId":"43e326c3-a0fb-4871-a24f-7b57891a616b"}
+{"level":"info","msg":"request","route":"unmatched","status":401,"ms":0,"reqId":"b1c62fa0-37ac-4354-a275-f6b0225616a0"}
+{"level":"info","msg":"request","route":"unmatched","status":404,"ms":0,"reqId":"7d183327-0a94-4d15-97c7-a394668dc0b9"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":24,"reqId":"b7dfd66b-426d-4da0-89e6-4856225f5e22"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"549d7d1b-5676-4c56-af6e-524c82070cd7"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"4f56a416-6cb8-4011-82a3-bbc7f7b4bb82"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":400,"ms":1,"reqId":"74fdbafd-83a3-4982-a843-a5aaff94b023"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"22036e66-1112-40b5-92f7-6cc0e1b2e021"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"0bab8ead-82fa-436b-abd4-0600d876560c"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":7,"reqId":"b3c5ad0d-725e-4077-a791-ac1673fc1278"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":1,"reqId":"24e9f826-9f62-4381-9778-0cc7f4768984"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"3bfb16e5-26f0-473f-9b2d-0eb0217afd8e"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":428,"ms":0,"reqId":"6fb25bbb-215a-4eb5-9051-430ec47d0718"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":412,"ms":2,"reqId":"3c6da62a-4c7e-4b0e-90cd-c77210e6c902"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":9,"reqId":"783d7403-5852-41e7-8dea-1ce633bc0e93"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":412,"ms":3,"reqId":"0416dc92-9c9c-4293-96dc-0be7e0a03556"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"6709df44-3a2c-44f1-80ab-e3ffaa248922"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":400,"ms":0,"reqId":"dedafdb7-5774-410c-9837-bcee640f0cdf"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"b70b1b9a-de95-45bd-84ae-09cbe1849127"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"f164baa5-f756-40be-a681-da5c5ec64b97"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"3a4567c6-dac9-4657-9178-c86415dd61ed"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"89a85288-0048-4f26-b2a1-bf4e7fe09160"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":6,"reqId":"ac7f4501-a30e-4a91-8038-5148df361975"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"64a8cbfe-22da-41ce-bb69-3991876e738e"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":400,"ms":1,"reqId":"270e7f74-c4e4-4b3e-8df5-6e6d2fc62128"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"03b4240e-10c8-4b0f-ab0c-0aacbdb9716f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"99b073d2-9952-46c8-803a-dad6e70caddb"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":7,"reqId":"93584458-b897-4e7d-b9d2-58aa7ff3735b"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":409,"ms":5,"reqId":"03b230ea-8293-46f6-907d-cd85204af088"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"18b0f198-1980-4323-98d3-029b12ab7277"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":4,"reqId":"7cc81cfe-3485-4b06-bb65-2496c313aefd"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"b80c3541-0e7c-44f1-9838-0ebd1dc9489f"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":400,"ms":1,"reqId":"cad09fa6-de90-452a-816b-c82f64ff7e30"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"f163f3c5-441f-4bd0-9244-029bf0641271"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"36d56fcb-9463-4ac8-a14e-f00188eeaa7f"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":413,"ms":0,"reqId":"897c142c-c06e-49d1-84cc-3bfa53813c46"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":415,"ms":0,"reqId":"36589490-b5d5-4544-ba46-2cfd1fad7850"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":400,"ms":0,"reqId":"0adf4cff-67b4-4f7d-a002-008581372116"}
+ [32m✓[39m test/me.test.js [2m([22m[2m17 tests[22m[2m)[22m[32m 158[2mms[22m[39m
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":24,"reqId":"0b994c4d-4689-4637-b125-06ebe99833a0"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":10,"reqId":"4bc432b6-33f1-4ebb-82fe-421fedac5b8b"}
+{"level":"info","msg":"request","route":"POST /v1/account/delete","status":503,"ms":16,"reqId":"dc6888ea-d1c7-4aed-87c8-3bcca2026e36"}
+{"level":"info","msg":"request","route":"GET /v1/account/delete","status":200,"ms":2,"reqId":"a9830c47-50dd-478b-9a55-06618dee1e46"}
+{"level":"info","msg":"account.deleted","ok":true}
+{"level":"info","msg":"request","route":"POST /v1/account/delete","status":200,"ms":20,"reqId":"c9d659e0-06b4-46dc-841b-7ce066f3643a"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"fd0ceae6-7405-484b-9f41-77f1e206d2f1"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"0fd9bd19-693d-402e-8ef9-e38057799720"}
+{"level":"info","msg":"request","route":"POST /v1/account/delete","status":403,"ms":0,"reqId":"98d93248-3d7c-4aa0-88d4-16a87fcea974"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"d67bde3e-2cda-4d84-a8dc-4516fc01adec"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"2fc93614-78dc-44b2-ada9-d4a1ecca2866"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"e0fa8e61-c15b-4700-a375-99184650071f"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"75b904c1-3ec3-4a92-9e88-158a601f0dbd"}
+{"level":"info","msg":"request","route":"POST /v1/friends/requests","status":200,"ms":12,"reqId":"b898daa9-7782-42ac-987d-afc06389019e"}
+{"level":"info","msg":"request","route":"POST /v1/friends/respond","status":200,"ms":4,"reqId":"696d4ff0-ce11-4d96-bfb3-76807477a77b"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":8,"reqId":"80ee5274-955a-4ab0-95d1-62e612f2e4a5"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":8,"reqId":"0e307c5b-30ff-4199-bd98-3e59dc0f5270"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":4,"reqId":"5173240e-70ef-4814-9079-cbd8baf9622a"}
+{"level":"info","msg":"request","route":"POST /v1/challenges","status":200,"ms":5,"reqId":"365608e9-53dd-4e86-8d80-21703f759fa0"}
+{"level":"info","msg":"request","route":"POST /v1/challenges/{id}/join","status":200,"ms":6,"reqId":"38f20f83-1c39-4122-b322-d1b79cb04504"}
+{"level":"info","msg":"account.deleted","ok":true}
+{"level":"info","msg":"request","route":"POST /v1/account/delete","status":200,"ms":22,"reqId":"227d672e-d015-457d-b868-1c214a7392c8"}
+{"level":"info","msg":"request","route":"GET /v1/friends","status":200,"ms":1,"reqId":"c51ac8cc-deb0-40c3-ae19-f28a3d21f9d0"}
+{"level":"info","msg":"request","route":"GET /v1/challenges","status":200,"ms":3,"reqId":"31625e4e-5261-47ca-bcf8-491ea9aff170"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"21d72db4-edca-47cf-a588-ca6a92ece59e"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"f7acacba-fa92-4c2d-8f96-26215fe6ee10"}
+{"level":"info","msg":"request","route":"GET /v1/account/delete","status":200,"ms":2,"reqId":"bb972302-649e-4123-be1e-1355ebc6a367"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":6,"reqId":"33d7ab96-eb9b-4298-8b6e-75d47712286c"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"210e91df-7efa-4556-b2d0-792106961de3"}
+{"level":"info","msg":"account.deleted","ok":true}
+{"level":"info","msg":"request","route":"POST /v1/account/delete","status":200,"ms":12,"reqId":"48bc5a41-6a18-4139-baa3-0a72ecb148b9"}
+{"level":"info","msg":"account.deleted","ok":true}
+{"level":"info","msg":"request","route":"POST /v1/account/delete","status":200,"ms":8,"reqId":"4320a138-9682-472a-88f0-cbabdc6c0e30"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":2,"reqId":"ede1f3f6-50f4-4e99-966f-402efd5161d0"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"072ffe6c-0266-4ead-a07f-76d3908401d6"}
+{"level":"info","msg":"request","route":"POST /v1/devices","status":200,"ms":4,"reqId":"9d4a1660-701d-4947-aae4-776bd6c4f964"}
+{"level":"info","msg":"request","route":"GET /v1/account/export","status":200,"ms":3,"reqId":"2fffedbb-dd6f-49e8-b4f7-e87ff8b740e1"}
+ [32m✓[39m test/account.test.js [2m([22m[2m5 tests[22m[2m)[22m[32m 239[2mms[22m[39m
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":24,"reqId":"06a1e86e-a53e-4b62-b6c3-01a3250ca681"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":11,"reqId":"3ced8042-8b72-4b5a-8bcf-a7581b935614"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":6,"reqId":"9118d639-1fa1-43eb-86e8-d1fba002a403"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":7,"reqId":"4cfe6285-735a-4652-b9f4-4bc4f7294e39"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":7,"reqId":"2679ef02-c9a9-47c4-a34a-5d675bc6d1ee"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":3,"reqId":"1ba9968d-2476-4290-acbc-a451a6acbd1b"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":7,"reqId":"9259a40f-fb80-48f6-9d24-a67080655068"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":409,"ms":7,"reqId":"66084f7e-315a-4d67-b32e-c9efef33ab60"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":5,"reqId":"faded69c-d407-4086-852c-2398451f44a3"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":400,"ms":0,"reqId":"cb1cc827-d860-4596-bffa-b73cb5e3398c"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":400,"ms":1,"reqId":"90518715-6a48-4f5d-bfb1-3d23fb955f56"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":400,"ms":0,"reqId":"81053860-bd9d-4771-882f-19a32b2ade52"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":7,"reqId":"6ca1938a-3232-4668-b2f9-8139da6f410f"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":3,"reqId":"241341e9-bbd4-4842-aaf6-06669ed8595c"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":6,"reqId":"f66f869b-1e6c-4527-aae4-66a21b4b153f"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":4,"reqId":"a615d70b-51c7-4c5b-a1ef-c59420f4e825"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":400,"ms":0,"reqId":"5a11207f-705d-479d-b206-72f969cb4cfd"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":400,"ms":0,"reqId":"729ce13e-ced9-49d6-bc3c-34d18e7085a9"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":4,"reqId":"d595d01e-129f-4a4e-89f2-d932aabe30f9"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":3,"reqId":"6acc39ba-f6c9-46d1-9e0f-68944cbc7abd"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":7,"reqId":"565ffe82-d557-4a9f-bb42-aa086f0b208f"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":412,"ms":7,"reqId":"4e27de4f-106c-4d69-8252-6bf3361823e6"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":4,"reqId":"b8e92e2c-f8b2-4a04-bfed-cfee8dad26b2"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":4,"reqId":"3cee4ed3-5d1e-4fd2-866a-5653eec46de1"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":9,"reqId":"015d3232-fa99-49c6-ab14-25b1c5e4028b"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":3,"reqId":"254627c1-dab4-4c90-a0c8-cc6e4f820e1b"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":200,"ms":11,"reqId":"0d6b4482-ff19-4c16-a728-fb30e7188488"}
+{"level":"info","msg":"request","route":"PUT /v1/goals","status":409,"ms":12,"reqId":"ad7e5b68-401c-448a-9202-6f6edbc994d5"}
+{"level":"info","msg":"request","route":"GET /v1/goals","status":200,"ms":3,"reqId":"69c2c77c-ba4a-4546-9575-e61b0a350636"}
+ [32m✓[39m test/goals.test.js [2m([22m[2m8 tests[22m[2m)[22m[32m 166[2mms[22m[39m
+ [32m✓[39m test/idempotency.test.js [2m([22m[2m8 tests[22m[2m)[22m[33m 473[2mms[22m[39m
+ [32m✓[39m test/unit.test.js [2m([22m[2m8 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m test/delivery.test.js [2m([22m[2m5 tests[22m[2m)[22m[32m 73[2mms[22m[39m
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":403,"ms":23,"reqId":"7b0aa761-e3eb-4307-bf1e-8a9ad9c06147"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":4,"reqId":"f6dd65e0-becb-475b-9bbc-55fc6d9529d0"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":7,"reqId":"442faf41-8bb3-4a6f-8808-7d1ae7a55a62"}
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":400,"ms":0,"reqId":"73aa0db7-c900-455f-a035-834021798379"}
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":400,"ms":11,"reqId":"d03b4911-b21e-4f46-a21a-8ff15fb6e7d3"}
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":400,"ms":0,"reqId":"7fb4054f-1be2-4eee-b1ba-2a7fd56b6c6f"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":5,"reqId":"56f07d28-e3cd-4a1c-a8e8-500f214f7130"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":5,"reqId":"3a9cc272-4022-4726-96f8-9de896bbd9b5"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"f95d9074-b3a0-4e5e-b02d-fbe0bae5636a"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":4,"reqId":"f0170938-9128-4abe-8f80-7b1b87d59cf5"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":9,"reqId":"055d0fb4-0ff4-48f8-9e56-13034a79f21f"}
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":200,"ms":5,"reqId":"5a6ab5b9-78f1-499b-a7dc-b689c9d60f94"}
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":200,"ms":3,"reqId":"9ec4a191-f4dd-44ae-82a2-582d64e186f7"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"664fa51a-5c18-4a88-81b9-a29e0e098b61"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":4,"reqId":"2a9acdc5-9477-4ce2-931c-e84c48752b3b"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":7,"reqId":"7c3a5ed4-f0dc-499e-b9e3-489851b4186c"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":7,"reqId":"ee90770c-46bb-4d8b-85ca-27991ebd02a2"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"6e44c738-d14f-43c6-939f-7646773dcccd"}
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":200,"ms":4,"reqId":"bd141ce1-3d24-418f-8649-636576b3ea12"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":200,"ms":3,"reqId":"731c8a6a-83f7-45f4-a2c9-24c70aaf5e47"}
+{"level":"info","msg":"request","route":"PATCH /v1/me","status":200,"ms":6,"reqId":"2ae280a3-8535-4d0a-abfe-70b242f1d5e8"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":7,"reqId":"a46faa04-428f-40df-868d-9122de337870"}
+{"level":"info","msg":"request","route":"POST /v1/usage/sync","status":200,"ms":6,"reqId":"773325a4-b61b-473b-99f3-90aa39c746fd"}
+{"level":"info","msg":"request","route":"GET /v1/wrapped","status":200,"ms":3,"reqId":"3d1ec0da-007b-4c93-b6a6-31ece450cc9d"}
+ [32m✓[39m test/wrapped.test.js [2m([22m[2m4 tests[22m[2m)[22m[32m 141[2mms[22m[39m
+ [32m✓[39m test/challenge-reads.test.js [2m([22m[2m2 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m test/google-auth.test.js [2m([22m[2m12 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m test/batch.test.js [2m([22m[2m4 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+{"level":"info","msg":"request","route":"GET /health","status":200,"ms":19,"reqId":"ecd6f292-f6df-4d9a-9c68-93dab30550e2"}
+{"level":"info","msg":"request","route":"GET /health","status":503,"ms":0,"reqId":"f00ed7e0-ac68-48d9-801a-c8735a25c63a"}
+{"level":"info","msg":"request","route":"GET /v1/me","status":401,"ms":0,"reqId":"d483c692-cc8d-4d53-b4ce-cf98f78c3587"}
+{"level":"info","msg":"request","route":"unmatched","status":401,"ms":0,"reqId":"4ae7d78c-2dd4-435c-a64d-3bd27543d762"}
+ [32m✓[39m test/health.test.js [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m14 passed[39m[22m[90m (14)[39m
+[2m      Tests [22m [1m[32m135 passed[39m[22m[90m (135)[39m
+[2m   Start at [22m 15:25:11
+[2m   Duration [22m 6.91s[2m (tests 71%, import 25%, transform 4%, worker 1%)[22m
+
+[2m    Isolate [22m [33m14 workers spawned[39m[2m · ~57ms startup each (spawn + environment, per file)[22m
+[2m            [22m [2mat least ~741ms faster with [22m[33misolate: false[39m[2m — reuses workers across files instead of one per file[22m
+
+::endgroup::
+
+ Tasks:    3 successful, 3 total
+Cached:    1 cached, 3 total
+  Time:    7.406s 
+

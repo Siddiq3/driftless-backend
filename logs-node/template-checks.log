@@ -1,0 +1,44 @@
+
+> driftless-backend@ test:template /home/runner/work/driftless-backend/driftless-backend
+> node --test scripts/template.test.mjs
+
+TAP version 13
+# Subtest: every application route requires Google JWT; only health and Play webhook are public
+ok 1 - every application route requires Google JWT; only health and Play webhook are public
+  ---
+  duration_ms: 1.60826
+  type: 'test'
+  ...
+# Subtest: database retains data, backups, encryption, TTL and the application index
+ok 2 - database retains data, backups, encryption, TTL and the application index
+  ---
+  duration_ms: 0.245216
+  type: 'test'
+  ...
+# Subtest: both deployable archives contain their ESM handler and use Node 22 ARM64
+ok 3 - both deployable archives contain their ESM handler and use Node 22 ARM64
+  ---
+  duration_ms: 147.101676
+  type: 'test'
+  ...
+# Subtest: IAM data access stays scoped to this stack and billing secret is retained
+ok 4 - IAM data access stays scoped to this stack and billing secret is retained
+  ---
+  duration_ms: 0.187595
+  type: 'test'
+  ...
+# Subtest: scheduled reconciliation, logs, throttling and error alarms remain enabled
+ok 5 - scheduled reconciliation, logs, throttling and error alarms remain enabled
+  ---
+  duration_ms: 0.316076
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 190.013222

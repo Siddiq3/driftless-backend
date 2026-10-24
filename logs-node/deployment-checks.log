@@ -1,0 +1,56 @@
+
+> driftless-backend@ test:deployment /home/runner/work/driftless-backend/driftless-backend
+> node --test scripts/deployment.test.mjs
+
+TAP version 13
+# Subtest: accepts OIDC or ecommerce-style keys without a separate account ID
+ok 1 - accepts OIDC or ecommerce-style keys without a separate account ID
+  ---
+  duration_ms: 0.609889
+  type: 'test'
+  ...
+# Subtest: rejects missing settings, incomplete keys and malformed role ARNs
+ok 2 - rejects missing settings, incomplete keys and malformed role ARNs
+  ---
+  duration_ms: 0.934688
+  type: 'test'
+  ...
+# Subtest: reads only the production HTTPS API URL and rejects output injection
+ok 3 - reads only the production HTTPS API URL and rejects output injection
+  ---
+  duration_ms: 0.225049
+  type: 'test'
+  ...
+# Subtest: checks database readiness and protected-route authentication
+ok 4 - checks database readiness and protected-route authentication
+  ---
+  duration_ms: 0.654797
+  type: 'test'
+  ...
+# Subtest: retries transient startup failures
+ok 5 - retries transient startup failures
+  ---
+  duration_ms: 0.17298
+  type: 'test'
+  ...
+# Subtest: fails the deployment for unhealthy APIs or unprotected application routes
+ok 6 - fails the deployment for unhealthy APIs or unprotected application routes
+  ---
+  duration_ms: 0.217287
+  type: 'test'
+  ...
+# Subtest: legacy-stack guard allows only a confirmed absent stack, failing closed on AWS errors
+ok 7 - legacy-stack guard allows only a confirmed absent stack, failing closed on AWS errors
+  ---
+  duration_ms: 27.90225
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 71.940141
