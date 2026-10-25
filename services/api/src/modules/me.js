@@ -93,8 +93,9 @@ function ifMatchRev(event) {
 export async function patchMe(event, caller) {
   const patch = parseBody(event, v1.PatchMeRequest);
   const expectedRev = ifMatchRev(event);
-  const accounting=await readState({pk:Keys.user(caller.sub),sk:'ACCOUNTUSAGE#POLICY'});
-  if(accounting && patch.tz!==undefined && patch.tz!==accounting.tz) throw Errors.conflict('account_timezone_fixed','Account timezone changes are not supported');
+  const accounting = await readState({ pk: Keys.user(caller.sub), sk: 'ACCOUNTUSAGE#POLICY' });
+  if (accounting && patch.tz !== undefined && patch.tz !== accounting.tz)
+    throw Errors.conflict('account_timezone_fixed', 'Account timezone changes are not supported');
   const current = await loadProfile(caller.sub);
   if (current.rev !== expectedRev)
     throw Errors.preconditionFailed(`profile is at rev ${current.rev}`);
@@ -150,7 +151,15 @@ export async function patchMe(event, caller) {
   }
   // A profile timezone patch must also be safe if fixed-timezone setup committed after
   // the preliminary policy read. Preserve handle/profile cancellation indexes above.
-  if(patch.tz!==undefined) items.push({ConditionCheck:{TableName:tableName(),Key:{pk:Keys.user(caller.sub),sk:'ACCOUNTUSAGE#POLICY'},ConditionExpression:'attribute_not_exists(pk) OR tz = :tz',ExpressionAttributeValues:{':tz':patch.tz}}});
+  if (patch.tz !== undefined)
+    items.push({
+      ConditionCheck: {
+        TableName: tableName(),
+        Key: { pk: Keys.user(caller.sub), sk: 'ACCOUNTUSAGE#POLICY' },
+        ConditionExpression: 'attribute_not_exists(pk) OR tz = :tz',
+        ExpressionAttributeValues: { ':tz': patch.tz },
+      },
+    });
   try {
     await activeWrite(caller.sub, new TransactWriteCommand({ TransactItems: items }));
   } catch (e) {

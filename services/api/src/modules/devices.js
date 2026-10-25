@@ -30,11 +30,23 @@ export async function postDevice(event, caller) {
   await activeWrite(
     caller.sub,
     new UpdateCommand({
-      TableName: tableName(), Key: deviceKey(caller.sub,d.deviceId),
-      UpdateExpression: 'SET platform = :platform, lastSeen = :seen, #ttl = :ttl' + (d.pushToken ? ', pushToken = :token, pushTokenHash = :hash' : ''),
-      ExpressionAttributeNames: {'#ttl':'ttl'},
-      ExpressionAttributeValues: {':platform':d.platform,':seen':new Date(now*1000).toISOString(),':ttl':now+IDLE_TTL_SEC,
-        ...(d.pushToken ? {':token':d.pushToken,':hash':createHash('sha256').update(d.pushToken).digest('hex')} : {})},
+      TableName: tableName(),
+      Key: deviceKey(caller.sub, d.deviceId),
+      UpdateExpression:
+        'SET platform = :platform, lastSeen = :seen, #ttl = :ttl' +
+        (d.pushToken ? ', pushToken = :token, pushTokenHash = :hash' : ''),
+      ExpressionAttributeNames: { '#ttl': 'ttl' },
+      ExpressionAttributeValues: {
+        ':platform': d.platform,
+        ':seen': new Date(now * 1000).toISOString(),
+        ':ttl': now + IDLE_TTL_SEC,
+        ...(d.pushToken
+          ? {
+              ':token': d.pushToken,
+              ':hash': createHash('sha256').update(d.pushToken).digest('hex'),
+            }
+          : {}),
+      },
     }),
   );
   return json(200, { ok: true });

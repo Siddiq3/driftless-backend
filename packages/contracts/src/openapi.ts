@@ -1,4 +1,11 @@
-import { AccountUsageHistory, AccountUsageHistoryQuery, AccountUsageConfigure, AccountUsageReconcile, AccountUsageReserve, AccountUsageResponse } from './account-usage.js';
+import {
+  AccountUsageHistory,
+  AccountUsageHistoryQuery,
+  AccountUsageConfigure,
+  AccountUsageReconcile,
+  AccountUsageReserve,
+  AccountUsageResponse,
+} from './account-usage.js';
 import { z } from 'zod';
 import { Problem } from './common.js';
 import * as v1 from './v1/index.js';
@@ -16,11 +23,39 @@ type Route = {
 
 /** Single source of truth for the v1 HTTP surface. The API router is tested against this list. */
 export const ROUTES: readonly Route[] = [
-  { method: 'get', path: '/v1/usage/account/history', summary: 'Retained account period summaries with requesting device baseline', query: AccountUsageHistoryQuery, response: AccountUsageHistory },
-  { method: 'get', path: '/v1/usage/account', summary: 'Authoritative account period and usage', response: AccountUsageResponse },
-  { method: 'put', path: '/v1/usage/account', summary: 'Fixed timezone setup or next-day limits', request: AccountUsageConfigure, response: AccountUsageResponse },
-  { method: 'post', path: '/v1/usage/account/reconcile', summary: 'Cumulative device accounting contributions', request: AccountUsageReconcile },
-  { method: 'post', path: '/v1/usage/account/reserve', summary: 'Reserve period allowance atomically', request: AccountUsageReserve, response: AccountUsageResponse },
+  {
+    method: 'get',
+    path: '/v1/usage/account/history',
+    summary: 'Retained account period summaries with requesting device baseline',
+    query: AccountUsageHistoryQuery,
+    response: AccountUsageHistory,
+  },
+  {
+    method: 'get',
+    path: '/v1/usage/account',
+    summary: 'Authoritative account period and usage',
+    response: AccountUsageResponse,
+  },
+  {
+    method: 'put',
+    path: '/v1/usage/account',
+    summary: 'Fixed timezone setup or next-day limits',
+    request: AccountUsageConfigure,
+    response: AccountUsageResponse,
+  },
+  {
+    method: 'post',
+    path: '/v1/usage/account/reconcile',
+    summary: 'Cumulative device accounting contributions',
+    request: AccountUsageReconcile,
+  },
+  {
+    method: 'post',
+    path: '/v1/usage/account/reserve',
+    summary: 'Reserve period allowance atomically',
+    request: AccountUsageReserve,
+    response: AccountUsageResponse,
+  },
   {
     method: 'get',
     path: '/v1/account',

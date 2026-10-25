@@ -5,4 +5,4 @@ export * from './brain.js';
 export * from './view-rules.js';
 export * from './wrapped.js';
 
-export * from "./account-period.js";
+export * from './account-period.js';

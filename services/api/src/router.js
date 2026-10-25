@@ -1,4 +1,10 @@
-import { getAccountUsageHistory, getAccountUsage, configureAccountUsage, reconcileAccountUsage, reserveAccountUsage } from './modules/account-usage.js';
+import {
+  getAccountUsageHistory,
+  getAccountUsage,
+  configureAccountUsage,
+  reconcileAccountUsage,
+  reserveAccountUsage,
+} from './modules/account-usage.js';
 import { accountKey, readState, inactive, assertActive } from './lib/lifecycle.js';
 import { header } from './lib/http.js';
 import { getWrapped } from './modules/wrapped.js';
