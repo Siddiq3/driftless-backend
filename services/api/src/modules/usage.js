@@ -1,10 +1,11 @@
+import { activeWrite } from '../lib/lifecycle.js';
 import { GetCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { daysBetween } from '@siddiq3/driftless-contracts/domain';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
 import { Errors, HttpError, json, parseBody, rawBody, validate } from '../lib/http.js';
 import { withIdempotency } from '../lib/idempotency.js';
-import { loadOrCreateProfile } from './me.js';
+import { loadProfile } from './me.js';
 /** Aggregates expire 400 days after their local date (PRIVACY_AND_DATA_RETENTION §1). */
 export const AGGREGATE_RETENTION_DAYS = 400;
 export const MAX_HISTORY_DAYS = 400;
@@ -30,7 +31,8 @@ async function applyDay(sub, d, now) {
   const key = { pk: Keys.user(sub), sk: Keys.day(d.localDate, d.deviceId) };
   const fields = Object.entries({ ...d, ttl: ttlFor(d.localDate), receivedAt: now });
   try {
-    await ddb().send(
+    await activeWrite(
+      sub,
       new UpdateCommand({
         TableName: tableName(),
         Key: key,
@@ -63,7 +65,7 @@ export async function postUsageSync(event, caller) {
   const req = parseBody(event, v1.UsageSyncRequest);
   const body = rawBody(event);
   return withIdempotency(event, caller.sub, body, async () => {
-    const profile = await loadOrCreateProfile(caller.sub);
+    const profile = await loadProfile(caller.sub);
     if (!profile.consent.cloudSync) {
       throw new HttpError(403, 'consent_required', 'cloud sync is off for this account');
     }

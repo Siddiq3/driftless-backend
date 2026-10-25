@@ -1,3 +1,4 @@
+import { activeWrite, assertActive } from '../lib/lifecycle.js';
 import { randomUUID } from 'node:crypto';
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
@@ -11,9 +12,10 @@ import { comparisonCount } from '../lib/comparison-count.js';
 export const MAX_CHALLENGE_DAYS = 31;
 const metaKey = (id) => ({ pk: `CHAL#${id}`, sk: 'META' });
 const memberKey = (id, sub) => ({ pk: `CHAL#${id}`, sk: `MEMBER#${sub}` });
+const journalKey = (id, sub) => ({ pk: Keys.user(sub), sk: `MEMBERSHIP#${id}` });
 const toSummary = (m) => ({
   challengeId: m.challengeId,
-  ownerId: m.ownerId,
+  ownerId: m.ownerUserId ?? null,
   title: m.title,
   metric: m.metric,
   startDate: m.startDate,
@@ -62,11 +64,13 @@ export async function postChallenge(event, caller) {
     ...metaKey(id),
     challengeId: id,
     ownerId: caller.sub,
+    ownerUserId: caller.userId,
     ...c,
     memberCount: 1,
     ttl,
   };
-  await ddb().send(
+  await activeWrite(
+    caller.sub,
     new TransactWriteCommand({
       TransactItems: [
         {
@@ -77,6 +81,15 @@ export async function postChallenge(event, caller) {
           },
         },
         { Put: { TableName: tableName(), Item: memberItem(id, caller.sub, ttl) } },
+        {
+          Put: { TableName: tableName(), Item: { ...journalKey(id, caller.sub), challengeId: id } },
+        },
+        {
+          Put: {
+            TableName: tableName(),
+            Item: { pk: Keys.user(caller.sub), sk: `OWNEDCHALLENGE#${id}`, challengeId: id },
+          },
+        },
       ],
     }),
   );
@@ -85,6 +98,8 @@ export async function postChallenge(event, caller) {
 export async function postJoin(event, caller) {
   const id = idParam(event);
   const meta = await getMeta(id);
+  if (!meta.ownerId) throw Errors.notFound();
+  await assertActive(meta.ownerId);
   // Friends-only (D-011): you can join only challenges created by a friend.
   if (meta.ownerId !== caller.sub && !(await areFriends(caller.sub, meta.ownerId)))
     throw Errors.notFound();
@@ -92,7 +107,8 @@ export async function postJoin(event, caller) {
   if (localDateOf(Date.now(), meta.tz) > meta.endDate)
     throw Errors.conflict('challenge_over', 'this challenge has ended');
   try {
-    await ddb().send(
+    await activeWrite(
+      caller.sub,
       new TransactWriteCommand({
         TransactItems: [
           {
@@ -111,8 +127,15 @@ export async function postJoin(event, caller) {
               ConditionExpression: 'attribute_not_exists(pk)',
             },
           },
+          {
+            Put: {
+              TableName: tableName(),
+              Item: { ...journalKey(id, caller.sub), challengeId: id },
+            },
+          },
         ],
       }),
+      [meta.ownerId],
     );
   } catch (e) {
     if (isConditionalFailure(e)) throw Errors.conflict('challenge_full', 'this challenge is full');
@@ -123,7 +146,8 @@ export async function postJoin(event, caller) {
 export async function postLeave(event, caller) {
   const id = idParam(event);
   try {
-    await ddb().send(
+    await activeWrite(
+      caller.sub,
       new TransactWriteCommand({
         TransactItems: [
           {
@@ -142,6 +166,7 @@ export async function postLeave(event, caller) {
               ExpressionAttributeValues: { ':one': 1, ':zero': 0 },
             },
           },
+          { Delete: { TableName: tableName(), Key: journalKey(id, caller.sub) } },
         ],
       }),
     );
@@ -273,6 +298,10 @@ export async function getLeaderboard(event, caller) {
         const p = profiles.get(sub);
         if (
           !p?.handle ||
+          !(await assertActive(sub).then(
+            () => true,
+            () => false,
+          )) ||
           !p.consent?.cloudSync ||
           !p.consent.shareWithFriends ||
           meta.startDate > to
@@ -283,7 +312,7 @@ export async function getLeaderboard(event, caller) {
           meta.metric === 'goal_days' ? minutesGoal(sub) : Promise.resolve(null),
         ]);
         const score = scoreMember(meta.metric, days, goal);
-        return score === null ? null : { userId: sub, handle: p.handle, score };
+        return score === null ? null : { userId: p.userId, handle: p.handle, score };
       }),
     );
     scored.push(...batch.filter((member) => member !== null));

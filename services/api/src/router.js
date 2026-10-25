@@ -1,8 +1,17 @@
+import { getAccountUsageHistory, getAccountUsage, configureAccountUsage, reconcileAccountUsage, reserveAccountUsage } from './modules/account-usage.js';
+import { accountKey, readState, inactive, assertActive } from './lib/lifecycle.js';
+import { header } from './lib/http.js';
 import { getWrapped } from './modules/wrapped.js';
 import { requireCaller } from './lib/auth.js';
 import { Errors, HttpError, problem } from './lib/http.js';
 import { log } from './lib/log.js';
-import { getDeleteStatus, getExport, postDeleteAccount } from './modules/account.js';
+import {
+  getAccountState,
+  postRegister,
+  getDeleteStatus,
+  getExport,
+  postDeleteAccount,
+} from './modules/account.js';
 import { postPlayRtdn, postPlayVerify } from './modules/billing/index.js';
 import {
   getChallenges,
@@ -26,6 +35,13 @@ import { getUsageHistory, postUsageSync } from './modules/usage.js';
 import { getHealth } from './modules/health.js';
 /** Routes implemented so far. Routes in contracts.ROUTES not listed here return 404 (by design). */
 export const IMPLEMENTED = {
+  'GET /v1/usage/account': getAccountUsage,
+  'GET /v1/usage/account/history': getAccountUsageHistory,
+  'PUT /v1/usage/account': configureAccountUsage,
+  'POST /v1/usage/account/reconcile': reconcileAccountUsage,
+  'POST /v1/usage/account/reserve': reserveAccountUsage,
+  'GET /v1/account': getAccountState,
+  'POST /v1/account/register': postRegister,
   'GET /v1/me': getMe,
   'GET /v1/wrapped': getWrapped,
   'PATCH /v1/me': patchMe,
@@ -103,7 +119,27 @@ export async function route(event) {
     if (matched) label = matched.label;
     const caller = requireCaller(event); // authenticate before revealing which routes exist
     if (!matched) throw Errors.notFound();
-    const res = await matched.handler(event, caller);
+    let bound = caller;
+    if (
+      ![
+        'GET /v1/account',
+        'POST /v1/account/register',
+        'POST /v1/account/delete',
+        'GET /v1/account/delete',
+      ].includes(key)
+    ) {
+      const state = await readState(accountKey(caller.sub));
+      const supplied = header(event, 'x-account-incarnation');
+      if (
+        state?.state !== 'active' ||
+        (supplied !== state.incarnation && !(key === 'GET /v1/me' && !supplied))
+      )
+        throw inactive();
+      await assertActive(state.incarnation);
+      // Internal storage owner is the incarnation. Public identity remains the Google-derived UUID.
+      bound = { ...caller, userId: caller.sub, sub: state.incarnation };
+    }
+    const res = await matched.handler(event, bound);
     status = res.statusCode ?? 200;
     return res;
   } catch (e) {

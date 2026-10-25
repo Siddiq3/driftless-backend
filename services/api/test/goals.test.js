@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { route } from '../src/router.js';
-import { bodyOf, event, newSub } from './helpers.js';
+import { bodyOf, event, newAccount } from './helpers.js';
 const goal = (over = {}) => ({
   goalId: randomUUID(),
   metric: 'minutes',
@@ -16,7 +16,7 @@ const put = (sub, goals) =>
 const get = (sub) => route(event({ path: '/v1/goals', sub }));
 describe('goals', () => {
   it('starts empty, then stores the set', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     expect(v1.GoalsResponse.parse(bodyOf(await get(sub))).goals).toEqual([]);
     const g = goal();
     const r = await put(sub, [g]);
@@ -24,7 +24,7 @@ describe('goals', () => {
     expect(v1.GoalsResponse.parse(bodyOf(await get(sub))).goals).toEqual([g]);
   });
   it('replaces the set: missing goals are deleted', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     const a = goal();
     const b = goal({ metric: 'views', dailyLimit: 30 });
     await put(sub, [a, b]);
@@ -34,7 +34,7 @@ describe('goals', () => {
     expect(goals[0]).toMatchObject({ goalId: b.goalId, dailyLimit: 20, rev: 2 });
   });
   it('rejects an older rev of a goal with 409 and changes nothing', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     const a = goal({ rev: 3 });
     await put(sub, [a]);
     const r = await put(sub, [{ ...a, rev: 2, dailyLimit: 999 }]);
@@ -43,7 +43,7 @@ describe('goals', () => {
     expect(v1.GoalsResponse.parse(bodyOf(await get(sub))).goals[0].dailyLimit).toBe(45);
   });
   it('validates limits, count and duplicates', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     expect((await put(sub, [goal({ dailyLimit: 1441 })])).statusCode).toBe(400);
     expect(
       (
@@ -57,8 +57,8 @@ describe('goals', () => {
     expect((await put(sub, [g, g])).statusCode).toBe(400);
   });
   it("users can't see or overwrite each other's goals", async () => {
-    const a = newSub();
-    const b = newSub();
+    const a = await newAccount();
+    const b = await newAccount();
     const g = goal();
     await put(a, [g]);
     expect(v1.GoalsResponse.parse(bodyOf(await get(b))).goals).toEqual([]);
@@ -66,14 +66,14 @@ describe('goals', () => {
     expect(v1.GoalsResponse.parse(bodyOf(await get(a))).goals[0].dailyLimit).toBe(45);
   });
   it('rejects onboarding seed IDs without weakening UUID validation', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     for (const goalId of ['setup-views', 'setup-minutes']) {
       expect((await put(sub, [goal({ goalId })])).statusCode).toBe(400);
     }
     expect(v1.GoalsResponse.parse(bodyOf(await get(sub))).goals).toEqual([]);
   });
   it('rejects stale snapshots without deleting another device goal', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     const a = goal();
     const b = goal();
     const old = await get(sub);
@@ -105,7 +105,7 @@ describe('goals', () => {
     expect(written.headers.etag).not.toBe(fresh.headers.etag);
   });
   it('allows only one concurrent replacement of the same snapshot', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     const snapshot = await get(sub);
     const writes = await Promise.all(
       [goal(), goal()].map((g) =>

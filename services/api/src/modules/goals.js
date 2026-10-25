@@ -1,3 +1,4 @@
+import { activeWrite } from '../lib/lifecycle.js';
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
@@ -86,7 +87,7 @@ export async function putGoals(event, caller) {
       })),
   ];
   try {
-    await ddb().send(new TransactWriteCommand({ TransactItems: items }));
+    await activeWrite(caller.sub, new TransactWriteCommand({ TransactItems: items }));
   } catch (e) {
     if (isConditionalFailure(e))
       throw Errors.conflict(

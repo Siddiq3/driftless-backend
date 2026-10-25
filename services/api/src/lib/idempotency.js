@@ -1,3 +1,4 @@
+import { activeWrite } from './lifecycle.js';
 import { createHash } from 'node:crypto';
 import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { IdempotencyKey } from '@siddiq3/driftless-contracts';
@@ -32,7 +33,8 @@ export async function withIdempotency(
   const hash = requestHash(event.requestContext.http.method, event.rawPath, body);
   const now = nowSec();
   try {
-    await ddb().send(
+    await activeWrite(
+      sub,
       new PutCommand({
         TableName: tableName(),
         Item: {
@@ -77,12 +79,13 @@ export async function withIdempotency(
   try {
     result = await fn();
   } catch (e) {
-    await release(key);
+    await release(sub, key);
     throw e;
   }
   const status = result.statusCode ?? 200;
   if (status >= 200 && status < 300) {
-    await ddb().send(
+    await activeWrite(
+      sub,
       new UpdateCommand({
         TableName: tableName(),
         Key: key,
@@ -92,22 +95,21 @@ export async function withIdempotency(
       }),
     );
   } else {
-    await release(key);
+    await release(sub, key);
   }
   return result;
 }
-async function release(key) {
+async function release(sub, key) {
   // Mark as stale so the same request can be retried immediately.
-  await ddb()
-    .send(
-      new UpdateCommand({
-        TableName: tableName(),
-        Key: key,
-        UpdateExpression: 'SET startedAt = :zero',
-        ConditionExpression: '#s = :ip',
-        ExpressionAttributeNames: { '#s': 'status' },
-        ExpressionAttributeValues: { ':zero': 0, ':ip': 'in_progress' },
-      }),
-    )
-    .catch(() => undefined);
+  await activeWrite(
+    sub,
+    new UpdateCommand({
+      TableName: tableName(),
+      Key: key,
+      UpdateExpression: 'SET startedAt = :zero',
+      ConditionExpression: '#s = :ip',
+      ExpressionAttributeNames: { '#s': 'status' },
+      ExpressionAttributeValues: { ':zero': 0, ':ip': 'in_progress' },
+    }),
+  ).catch(() => undefined);
 }

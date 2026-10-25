@@ -1,17 +1,12 @@
+import { activeWrite, activeIncarnation, assertActive } from '../lib/lifecycle.js';
 import { randomInt } from 'node:crypto';
-import {
-  DeleteCommand,
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-  TransactWriteCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { daysBetween, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
 import { Errors, HttpError, json, parseBody, validate } from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
-import { loadOrCreateProfile } from './me.js';
+import { loadProfile } from './me.js';
 import { batchGet } from '../lib/batch.js';
 import { comparisonCount } from '../lib/comparison-count.js';
 export const MAX_FRIENDS = 200;
@@ -51,10 +46,15 @@ async function profiles(subs) {
     const keys = subs.slice(i, i + 100).map((s) => ({ pk: Keys.user(s), sk: Keys.profile }));
     for (const p of await batchGet(keys)) {
       const sub = String(p.pk).slice('USER#'.length);
-      if (p.handle)
+      const active = await assertActive(sub).then(
+        () => true,
+        () => false,
+      );
+      if (active && p.handle)
         map.set(sub, {
           handle: p.handle,
           displayName: p.displayName ?? null,
+          userId: p.userId,
         });
     }
   }
@@ -67,7 +67,7 @@ async function toFriends(items) {
     return p
       ? [
           {
-            userId: i.otherSub,
+            userId: p.userId,
             handle: p.handle,
             displayName: p.displayName,
             status: i.status,
@@ -118,7 +118,7 @@ export async function getFriendsDaily(event, caller) {
   const { date } = validate(v1.FriendsDailyQuery, { date: event.queryStringParameters?.date });
   const age = daysBetween(date, localDateOf(Date.now() + 14 * 3600_000, 'UTC'));
   if (age < 0 || age >= 400) throw Errors.badRequest('date must be within retained history');
-  const own = await loadOrCreateProfile(caller.sub);
+  const own = await loadProfile(caller.sub);
   if (!own.consent.cloudSync || !own.consent.shareWithFriends)
     throw new HttpError(
       403,
@@ -139,14 +139,21 @@ export async function getFriendsDaily(event, caller) {
             ConsistentRead: true,
           }),
         );
-        if (!profile.Item?.handle) return null;
+        if (
+          !profile.Item?.handle ||
+          !(await assertActive(friend.otherSub).then(
+            () => true,
+            () => false,
+          ))
+        )
+          return null;
         const consent = profile.Item?.consent;
         const daily =
           consent?.cloudSync && consent.shareWithFriends
             ? await dailyCount(friend.otherSub, date)
             : { status: 'private', views: null, updatedAt: null };
         return {
-          userId: friend.otherSub,
+          userId: profile.Item.userId,
           handle: profile.Item.handle,
           displayName: profile.Item.displayName ?? null,
           status: friend.status,
@@ -184,11 +191,24 @@ export async function postInvite(_e, caller) {
       () => INVITE_ALPHABET[randomInt(INVITE_ALPHABET.length)],
     ).join('');
     try {
-      await ddb().send(
-        new PutCommand({
-          TableName: tableName(),
-          Item: { ...inviteKey(code), sub: caller.sub, ttl: now + INVITE_TTL_SEC },
-          ConditionExpression: 'attribute_not_exists(pk)',
+      await activeWrite(
+        caller.sub,
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: tableName(),
+                Item: { ...inviteKey(code), sub: caller.sub, ttl: now + INVITE_TTL_SEC },
+                ConditionExpression: 'attribute_not_exists(pk)',
+              },
+            },
+            {
+              Put: {
+                TableName: tableName(),
+                Item: { pk: Keys.user(caller.sub), sk: `INVITE#${code}` },
+              },
+            },
+          ],
         }),
       );
       return json(200, {
@@ -224,6 +244,7 @@ export async function postFriendRequest(event, caller) {
   await requireOwnHandle(caller.sub);
   await rateLimit(caller.sub, 'friend_request', 20, 3600);
   const { sub: other, viaInvite } = await resolveTarget(body);
+  await assertActive(other);
   if (other === caller.sub) throw Errors.badRequest('you cannot add yourself');
   const mine = await friendStatus(caller.sub, other);
   if (mine === 'accepted') throw Errors.conflict('already_friends', 'you are already friends');
@@ -234,7 +255,8 @@ export async function postFriendRequest(event, caller) {
   // An invite code is the other person's consent; a mutual request means both asked.
   const accept = viaInvite || mine === 'pending_in';
   const now = new Date().toISOString();
-  await ddb().send(
+  await activeWrite(
+    caller.sub,
     new TransactWriteCommand({
       TransactItems: [
         {
@@ -274,11 +296,14 @@ export async function postFriendRequest(event, caller) {
   return json(200, { friend });
 }
 export async function postFriendRespond(event, caller) {
-  const { userId, accept } = parseBody(event, v1.FriendRespond);
+  const request = parseBody(event, v1.FriendRespond);
+  const { accept } = request;
+  const userId = await activeIncarnation(request.userId);
   const now = new Date().toISOString();
   try {
     if (accept) {
-      await ddb().send(
+      await activeWrite(
+        caller.sub,
         new TransactWriteCommand({
           TransactItems: [
             {
@@ -314,7 +339,8 @@ export async function postFriendRespond(event, caller) {
   return json(200, { ok: true });
 }
 async function removeBoth(a, b, requireStatus) {
-  await ddb().send(
+  await activeWrite(
+    a,
     new TransactWriteCommand({
       TransactItems: [
         {
@@ -336,7 +362,8 @@ async function removeBoth(a, b, requireStatus) {
   );
 }
 export async function postFriendRemove(event, caller) {
-  const { userId } = parseBody(event, v1.FriendRemove);
+  const request = parseBody(event, v1.FriendRemove);
+  const userId = await activeIncarnation(request.userId);
   try {
     await removeBoth(caller.sub, userId);
   } catch (e) {
@@ -344,15 +371,4 @@ export async function postFriendRemove(event, caller) {
     throw e;
   }
   return json(200, { ok: true });
-}
-/** Used by account deletion. */
-export async function deleteAllFriendships(sub) {
-  for (const f of await listFriendItems(sub)) {
-    await ddb().send(
-      new DeleteCommand({ TableName: tableName(), Key: friendKey(sub, f.otherSub) }),
-    );
-    await ddb().send(
-      new DeleteCommand({ TableName: tableName(), Key: friendKey(f.otherSub, sub) }),
-    );
-  }
 }

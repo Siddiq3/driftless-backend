@@ -34,8 +34,12 @@ export async function reconcilePlay(nowMs = Date.now(), horizonMs = 2 * 86_400_0
       ).Item;
       if (!p?.token || p.supersededBy || p.sub !== sub) continue;
       checked++;
-      const next = await applyPlayToken(sub, p.token, p.productId);
-      if (next.tier !== e.tier || next.state !== e.state) changed++;
+      try {
+        const next = await applyPlayToken(sub, p.token, p.productId);
+        if (next.tier !== e.tier || next.state !== e.state) changed++;
+      } catch (error) {
+        if (error.code !== 'account_inactive') throw error;
+      }
     }
     start = page.LastEvaluatedKey;
   } while (start);

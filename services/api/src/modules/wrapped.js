@@ -1,12 +1,12 @@
 import { v1 } from '@siddiq3/driftless-contracts';
 import { summarizeWrap, wrapBounds, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { Errors, HttpError, json, validate } from '../lib/http.js';
-import { loadOrCreateProfile } from './me.js';
+import { loadProfile } from './me.js';
 import { getUsageHistory } from './usage.js';
 /** Only existing opted-in day totals are read; no raw sessions, timestamps or peer profiles. */
 export async function getWrapped(event, caller) {
   const query = validate(v1.WrapQuery, event.queryStringParameters ?? {});
-  const profile = await loadOrCreateProfile(caller.sub);
+  const profile = await loadProfile(caller.sub);
   if (!profile.consent.cloudSync)
     throw new HttpError(403, 'consent_required', 'cloud sync is off for this account');
   if (query.end >= localDateOf(Date.now(), profile.tz))

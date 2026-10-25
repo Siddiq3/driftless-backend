@@ -16,6 +16,7 @@ const profile = {
   pk: `USER#${owner}`,
   sk: 'PROFILE',
   handle: 'dummy',
+  userId: owner,
   consent: { cloudSync: true, shareWithFriends: true },
 };
 beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-23T12:00:00Z')));
@@ -23,7 +24,7 @@ afterEach(() => vi.restoreAllMocks());
 function fake(profileValue = profile) {
   const send = vi.spyOn(ddb(), 'send').mockImplementation(async (command) => {
     if (command instanceof GetCommand)
-      return { Item: command.input.Key.sk === 'META' ? meta : { sub: owner } };
+      return { Item: command.input.Key.sk === 'META' ? meta : { sub: owner, state: 'active' } };
     if (command instanceof BatchGetCommand) return { Responses: { [tableName()]: [profileValue] } };
     if (command instanceof QueryCommand) {
       const values = command.input.ExpressionAttributeValues;

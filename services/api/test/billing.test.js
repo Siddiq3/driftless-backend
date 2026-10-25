@@ -5,7 +5,7 @@ import { setBillingDeps } from '../src/modules/billing/index.js';
 import { serviceAccountAssertion } from '../src/modules/billing/play-api.js';
 import { entitlementFromPlay, obfuscatedAccountId } from '../src/modules/billing/play-state.js';
 import { route } from '../src/router.js';
-import { bodyOf, event, newSub } from './helpers.js';
+import { bodyOf, event, newAccount, ownerOf } from './helpers.js';
 const PRO = new Set(['driftless_pro']);
 const NOW = Date.parse('2026-10-18T12:00:00Z');
 const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
@@ -15,7 +15,7 @@ const subscription = (sub, over = {}) => ({
   subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
   lineItems: [{ productId: 'driftless_pro', expiryTime: future }],
   acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
-  externalAccountIdentifiers: { obfuscatedExternalAccountId: obfuscatedAccountId(sub) },
+  externalAccountIdentifiers: { obfuscatedExternalAccountId: obfuscatedAccountId(ownerOf(sub)) },
   ...over,
 });
 class FakePlay {
@@ -110,7 +110,7 @@ describe('entitlementFromPlay (pure)', () => {
 });
 describe('POST /v1/billing/play/verify', () => {
   it('server-verifies, grants Pro, acknowledges, and /v1/me reflects it', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     play.subs.set('tok-1-purchase-token', subscription(sub));
     const r = await verify(sub, 'tok-1-purchase-token');
     expect(r.statusCode).toBe(200);
@@ -122,8 +122,8 @@ describe('POST /v1/billing/play/verify', () => {
     expect((await me(sub)).entitlement.tier).toBe('pro');
   });
   it('rejects a purchase made for another account (token theft)', async () => {
-    const owner = newSub();
-    const thief = newSub();
+    const owner = await newAccount();
+    const thief = await newAccount();
     play.subs.set('tok-2-purchase-token', subscription(owner));
     const r = await verify(thief, 'tok-2-purchase-token');
     expect(r.statusCode).toBe(403);
@@ -131,8 +131,8 @@ describe('POST /v1/billing/play/verify', () => {
     expect((await me(thief)).entitlement.tier).toBe('free');
   });
   it('a token already bound to one account cannot be bound to another', async () => {
-    const a = newSub();
-    const b = newSub();
+    const a = await newAccount();
+    const b = await newAccount();
     play.subs.set('tok-3-purchase-token', subscription(a));
     expect((await verify(a, 'tok-3-purchase-token')).statusCode).toBe(200);
     // Even if Google reported b's id (it won't), the binding check still stops it.
@@ -140,7 +140,7 @@ describe('POST /v1/billing/play/verify', () => {
     expect((await verify(b, 'tok-3-purchase-token')).statusCode).toBe(409);
   });
   it('unknown token → 404; wrong or unknown product → 400', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     expect((await verify(sub, 'nope-token-purchase-token')).statusCode).toBe(404);
     expect((await verify(sub, 'nope-token-purchase-token', 'other_product')).statusCode).toBe(400);
     play.subs.set(
@@ -150,7 +150,7 @@ describe('POST /v1/billing/play/verify', () => {
     expect((await verify(sub, 'tok-4-purchase-token')).statusCode).toBe(400);
   });
   it('an expired subscription does not grant Pro', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     play.subs.set(
       'tok-5-purchase-token',
       subscription(sub, { lineItems: [{ productId: 'driftless_pro', expiryTime: past }] }),
@@ -160,7 +160,7 @@ describe('POST /v1/billing/play/verify', () => {
     expect(play.acked).toEqual([]); // nothing to acknowledge without access
   });
   it('the client cannot claim Pro any other way', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await me(sub);
     const r = await route(
       event({
@@ -177,7 +177,7 @@ describe('POST /v1/billing/play/verify', () => {
 });
 describe('POST /webhooks/play-rtdn', () => {
   it('retries the same message after a transient Play failure', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     const token = 'retry-after-failure-purchase-token';
     play.subs.set(token, subscription(sub));
     await verify(sub, token);
@@ -212,7 +212,7 @@ describe('POST /webhooks/play-rtdn', () => {
     expect((await rtdn('other', push({}))).statusCode).toBe(403);
   });
   it('a refund (voided purchase) revokes Pro', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     play.subs.set('tok-6-purchase-token', subscription(sub));
     await verify(sub, 'tok-6-purchase-token');
     const r = await rtdn(
@@ -226,7 +226,7 @@ describe('POST /webhooks/play-rtdn', () => {
     expect((await me(sub)).entitlement).toMatchObject({ tier: 'free', state: 'revoked' });
   });
   it('state changes are re-read from Google (on hold → free, recovered → pro)', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     play.subs.set('tok-7-purchase-token', subscription(sub));
     await verify(sub, 'tok-7-purchase-token');
     play.subs.set(
@@ -253,7 +253,7 @@ describe('POST /webhooks/play-rtdn', () => {
     expect((await me(sub)).entitlement).toMatchObject({ tier: 'pro', state: 'active' });
   });
   it('duplicate Pub/Sub deliveries are processed once', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     play.subs.set('tok-8-purchase-token', subscription(sub));
     await verify(sub, 'tok-8-purchase-token');
     const msg = push(
@@ -264,7 +264,7 @@ describe('POST /webhooks/play-rtdn', () => {
     expect(bodyOf(await rtdn('good', msg))).toEqual({ duplicate: true });
   });
   it('after an upgrade, notifications for the old token are ignored', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     play.subs.set('old-tok-purchase-token', subscription(sub));
     await verify(sub, 'old-tok-purchase-token');
     play.subs.set(
@@ -340,7 +340,7 @@ describe('service account assertion', () => {
 describe('reconcile job', () => {
   it('re-checks expiring Pro entitlements with Google and applies changes', async () => {
     const { reconcilePlay } = await import('../src/modules/billing/reconcile.js');
-    const sub = newSub();
+    const sub = await newAccount();
     const soon = new Date(Date.now() + 3_600_000).toISOString();
     play.subs.set(
       'reconcile-purchase-token',

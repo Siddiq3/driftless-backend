@@ -4,14 +4,14 @@ import { v1 } from '@siddiq3/driftless-contracts';
 import { addDays, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { scoreMember } from '../src/modules/challenges.js';
 import { route } from '../src/router.js';
-import { bodyOf, event, newSub } from './helpers.js';
+import { bodyOf, event, newAccount } from './helpers.js';
 const call = (method, path, sub, body, headers) =>
   route(event({ method, path, sub, body, headers }));
 const today = localDateOf(Date.now(), 'UTC');
 let n = 0;
 /** A signed-up user with a handle; optionally sharing with friends. */
 async function user(share = true) {
-  const sub = newSub();
+  const sub = await newAccount();
   const handle = `u${Date.now().toString(36)}${(n++).toString(36)}`.slice(0, 20);
   await call('GET', '/v1/me', sub);
   const r = await route(
@@ -244,7 +244,7 @@ describe('friends', () => {
     expect(
       (await call('POST', '/v1/friends/requests', a.sub, { handle: 'nobody_here_zz' })).statusCode,
     ).toBe(404);
-    const noHandle = newSub();
+    const noHandle = await newAccount();
     await call('GET', '/v1/me', noHandle);
     expect(
       bodyOf(await call('POST', '/v1/friends/requests', noHandle, { handle: b.handle })).code,

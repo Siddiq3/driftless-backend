@@ -1,5 +1,6 @@
+import { activeWrite } from '../lib/lifecycle.js';
 import { createHash } from 'node:crypto';
-import { DeleteCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
 import { Errors, json, parseBody } from '../lib/http.js';
@@ -26,17 +27,14 @@ export async function postDevice(event, caller) {
   if (!ids.includes(d.deviceId) && ids.length >= MAX_DEVICES)
     throw Errors.conflict('too_many_devices', `limit is ${MAX_DEVICES}`);
   const now = Math.floor(Date.now() / 1000);
-  await ddb().send(
-    new PutCommand({
-      TableName: tableName(),
-      Item: {
-        ...deviceKey(caller.sub, d.deviceId),
-        platform: d.platform,
-        pushToken: d.pushToken,
-        pushTokenHash: createHash('sha256').update(d.pushToken).digest('hex'),
-        lastSeen: new Date(now * 1000).toISOString(),
-        ttl: now + IDLE_TTL_SEC,
-      },
+  await activeWrite(
+    caller.sub,
+    new UpdateCommand({
+      TableName: tableName(), Key: deviceKey(caller.sub,d.deviceId),
+      UpdateExpression: 'SET platform = :platform, lastSeen = :seen, #ttl = :ttl' + (d.pushToken ? ', pushToken = :token, pushTokenHash = :hash' : ''),
+      ExpressionAttributeNames: {'#ttl':'ttl'},
+      ExpressionAttributeValues: {':platform':d.platform,':seen':new Date(now*1000).toISOString(),':ttl':now+IDLE_TTL_SEC,
+        ...(d.pushToken ? {':token':d.pushToken,':hash':createHash('sha256').update(d.pushToken).digest('hex')} : {})},
     }),
   );
   return json(200, { ok: true });
@@ -45,7 +43,8 @@ export async function deleteDevice(event, caller) {
   const id = event.pathParameters?.id ?? '';
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw Errors.notFound();
   try {
-    await ddb().send(
+    await activeWrite(
+      caller.sub,
       new DeleteCommand({
         TableName: tableName(),
         Key: deviceKey(caller.sub, id),

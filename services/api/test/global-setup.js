@@ -1,8 +1,9 @@
+import { URL } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import {
   CreateTableCommand,
   DeleteTableCommand,
   DynamoDBClient,
-  ResourceNotFoundException,
   waitUntilTableExists,
 } from '@aws-sdk/client-dynamodb';
 /**
@@ -16,18 +17,15 @@ export default async function setup() {
       'DDB_ENDPOINT is not set. Start DynamoDB Local, e.g. docker run -p 8000:8000 amazon/dynamodb-local',
     );
   }
-  const TableName = (process.env.TABLE_NAME ??= 'driftless-test');
+  const url = new URL(endpoint);
+  if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))
+    throw new Error('Tests require loopback DynamoDB Local');
+  const TableName = (process.env.TABLE_NAME = `driftless-phase1-${randomUUID()}`);
   const client = new DynamoDBClient({
     endpoint,
     region: 'local',
     credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
   });
-  try {
-    await client.send(new DeleteTableCommand({ TableName }));
-  } catch (e) {
-    if (!(e instanceof ResourceNotFoundException) && e.name !== 'ResourceNotFoundException')
-      throw e;
-  }
   // Mirrors serverless.yml — keep in sync (deployment template tests assert the same key schema).
   await client.send(
     new CreateTableCommand({

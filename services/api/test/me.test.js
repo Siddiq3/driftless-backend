@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { ddb, Keys, tableName } from '../src/lib/ddb.js';
 import { route } from '../src/router.js';
-import { bodyOf, event, newSub } from './helpers.js';
+import { bodyOf, event, newAccount, ownerOf } from './helpers.js';
 const getMe = (sub, query) => route(event({ path: '/v1/me', sub, query }));
 const patch = (sub, body, rev = 1, extra = {}) =>
   route(
@@ -35,8 +35,8 @@ describe('authentication', () => {
   });
 });
 describe('GET /v1/me', () => {
-  it('creates a private default profile on first call and validates against the contract', async () => {
-    const sub = newSub();
+  it('reads the private default profile after explicit registration and validates against the contract', async () => {
+    const sub = await newAccount();
     const r = await getMe(sub);
     expect(r.statusCode).toBe(200);
     const body = v1.MeResponse.parse(bodyOf(r));
@@ -52,30 +52,30 @@ describe('GET /v1/me', () => {
   });
   it('advertises no capabilities in Phase 1 (nothing verified yet)', async () => {
     const body = v1.MeResponse.parse(
-      bodyOf(await getMe(newSub(), { platform: 'android', appVersion: '0.1.0' })),
+      bodyOf(await getMe(await newAccount(), { platform: 'android', appVersion: '0.1.0' })),
     );
     expect(Object.values(body.capabilities).filter(Boolean)).toEqual([true]); // only socialSharingOfUsage
     expect(body.capabilities.socialSharingOfUsage).toBe(true);
   });
   it('never allows iOS usage sharing', async () => {
     const body = v1.MeResponse.parse(
-      bodyOf(await getMe(newSub(), { platform: 'ios', appVersion: '0.1.0' })),
+      bodyOf(await getMe(await newAccount(), { platform: 'ios', appVersion: '0.1.0' })),
     );
     expect(body.capabilities.socialSharingOfUsage).toBe(false);
     expect(body.capabilities.videoCounting).toBe(false);
   });
   it('rejects bad client info', async () => {
-    expect((await getMe(newSub(), { platform: 'windows', appVersion: '1.0.0' })).statusCode).toBe(
-      400,
-    );
+    expect(
+      (await getMe(await newAccount(), { platform: 'windows', appVersion: '1.0.0' })).statusCode,
+    ).toBe(400);
   });
   it('treats an expired Pro record as free', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await ddb().send(
       new PutCommand({
         TableName: tableName(),
         Item: {
-          pk: Keys.user(sub),
+          pk: Keys.user(ownerOf(sub)),
           sk: Keys.entitlement,
           tier: 'pro',
           source: 'play',
@@ -91,7 +91,7 @@ describe('GET /v1/me', () => {
 });
 describe('PATCH /v1/me', () => {
   it('updates fields and bumps rev', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await getMe(sub);
     const r = await patch(sub, { displayName: 'Siddiq', tz: 'Asia/Kolkata' });
     expect(r.statusCode).toBe(200);
@@ -100,7 +100,7 @@ describe('PATCH /v1/me', () => {
     expect(v1.MeResponse.parse(bodyOf(await getMe(sub))).profile.rev).toBe(2);
   });
   it('428 without If-Match, 412 on a stale rev', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await getMe(sub);
     expect((await patch(sub, { displayName: 'A' }, null)).statusCode).toBe(428);
     expect((await patch(sub, { displayName: 'A' }, 7)).statusCode).toBe(412);
@@ -108,15 +108,15 @@ describe('PATCH /v1/me', () => {
     expect((await patch(sub, { displayName: 'B' }, 1)).statusCode).toBe(412); // replay of old rev
   });
   it('cannot set entitlement or unknown fields (no client-supplied Pro)', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await getMe(sub);
     const r = await patch(sub, { tier: 'pro' });
     expect(r.statusCode).toBe(400);
     expect(v1.MeResponse.parse(bodyOf(await getMe(sub))).entitlement.tier).toBe('free');
   });
   it("one user's update never touches another user's profile", async () => {
-    const a = newSub();
-    const b = newSub();
+    const a = await newAccount();
+    const b = await newAccount();
     await getMe(a);
     await getMe(b);
     await patch(b, { displayName: 'Bee' });
@@ -125,14 +125,14 @@ describe('PATCH /v1/me', () => {
     expect(aBody.userId).toBe(a);
   });
   it('a userId in the body is rejected, not honoured', async () => {
-    const a = newSub();
-    const b = newSub();
+    const a = await newAccount();
+    const b = await newAccount();
     await getMe(a);
     expect((await patch(b, { displayName: 'x', userId: a })).statusCode).toBe(400);
   });
   it('handles are unique; changing a handle frees the old one', async () => {
-    const a = newSub();
-    const b = newSub();
+    const a = await newAccount();
+    const b = await newAccount();
     await getMe(a);
     await getMe(b);
     const h = `u${a.replace(/-/g, '').slice(0, 12)}`;
@@ -145,7 +145,7 @@ describe('PATCH /v1/me', () => {
     expect((await patch(b, { handle: h })).statusCode).toBe(200);
   });
   it('shareWithFriends requires cloudSync', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await getMe(sub);
     expect((await patch(sub, { consent: { shareWithFriends: true } })).statusCode).toBe(400);
     expect(
@@ -153,7 +153,7 @@ describe('PATCH /v1/me', () => {
     ).toBe(200);
   });
   it('rejects oversized, non-JSON and malformed bodies', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await getMe(sub);
     const big = await route(
       event({

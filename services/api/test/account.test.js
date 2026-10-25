@@ -1,16 +1,17 @@
+import { HttpError } from '../src/lib/http.js';
 import { randomUUID } from 'node:crypto';
-import { BatchWriteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { TransactWriteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { describe, expect, it, vi } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { ddb, Keys, tableName } from '../src/lib/ddb.js';
 import { route } from '../src/router.js';
-import { bodyOf, event, newSub } from './helpers.js';
+import { bodyOf, event, newAccount, ownerOf } from './helpers.js';
 const call = (method, path, sub, body, claims) => route(event({ method, path, sub, body, claims }));
 const today = localDateOf(Date.now(), 'UTC');
 let n = 0;
 async function user() {
-  const sub = newSub();
+  const sub = await newAccount();
   const handle = `d${Date.now().toString(36)}${(n++).toString(36)}`;
   await call('GET', '/v1/me', sub);
   await route(
@@ -30,20 +31,21 @@ const rowsFor = async (sub) =>
       new QueryCommand({
         TableName: tableName(),
         KeyConditionExpression: 'pk = :p',
-        ExpressionAttributeValues: { ':p': Keys.user(sub) },
+        ExpressionAttributeValues: { ':p': Keys.user(ownerOf(sub)) },
       }),
     )
   ).Items ?? [];
 describe('account deletion', () => {
-  it('keeps deletion in progress and retryable when DynamoDB leaves unprocessed records', async () => {
+  it('keeps deletion in progress and retryable after a failed cleanup transaction', async () => {
     const a = await user();
     const client = ddb();
     const realSend = client.send.bind(client);
     const send = vi
       .spyOn(client, 'send')
       .mockImplementation((command) =>
-        command instanceof BatchWriteCommand
-          ? Promise.resolve({ UnprocessedItems: command.input.RequestItems })
+        command instanceof TransactWriteCommand &&
+        command.input.TransactItems.some((item) => item.Delete)
+          ? Promise.reject(new HttpError(503, 'unavailable', 'fixture interruption'))
           : realSend(command),
       );
     const random = vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -130,7 +132,7 @@ describe('account deletion', () => {
     ).challenges;
     expect(mine[0].memberCount).toBe(1);
     // The handle can be taken by someone else now.
-    const c = newSub();
+    const c = await newAccount();
     await call('GET', '/v1/me', c);
     const take = await route(
       event({

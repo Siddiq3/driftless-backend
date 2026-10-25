@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { json, HttpError } from '../src/lib/http.js';
 import { IN_PROGRESS_LEASE_SEC, withIdempotency } from '../src/lib/idempotency.js';
-import { event, newSub } from './helpers.js';
+import { event, newOwner } from './helpers.js';
 const post = (key, body) =>
   event({
     method: 'POST',
@@ -12,7 +12,7 @@ const post = (key, body) =>
   });
 describe('withIdempotency', () => {
   it('runs once and replays the stored response for an identical retry', async () => {
-    const sub = newSub();
+    const sub = await newOwner();
     const key = randomUUID();
     let calls = 0;
     const fn = async () => json(200, { n: ++calls });
@@ -24,7 +24,7 @@ describe('withIdempotency', () => {
     expect(second.headers?.['idempotent-replayed']).toBe('true');
   });
   it('rejects reuse of a key for a different request (422)', async () => {
-    const sub = newSub();
+    const sub = await newOwner();
     const key = randomUUID();
     const fn = async () => json(200, {});
     await withIdempotency(post(key, { a: 1 }), sub, '{"a":1}', fn);
@@ -37,12 +37,12 @@ describe('withIdempotency', () => {
     const key = randomUUID();
     let calls = 0;
     const fn = async () => json(200, { n: ++calls });
-    await withIdempotency(post(key, {}), newSub(), '{}', fn);
-    await withIdempotency(post(key, {}), newSub(), '{}', fn);
+    await withIdempotency(post(key, {}), await newOwner(), '{}', fn);
+    await withIdempotency(post(key, {}), await newOwner(), '{}', fn);
     expect(calls).toBe(2);
   });
   it('a concurrent duplicate while the first is in flight gets 409', async () => {
-    const sub = newSub();
+    const sub = await newOwner();
     const key = randomUUID();
     let release;
     const gate = new Promise((r) => (release = r));
@@ -61,7 +61,7 @@ describe('withIdempotency', () => {
     expect((await slow).statusCode).toBe(200);
   });
   it('a failed attempt releases the key so the client can retry', async () => {
-    const sub = newSub();
+    const sub = await newOwner();
     const key = randomUUID();
     await expect(
       withIdempotency(post(key, {}), sub, '{}', async () => {
@@ -72,7 +72,7 @@ describe('withIdempotency', () => {
     expect(ok.statusCode).toBe(200);
   });
   it('non-2xx results are not stored', async () => {
-    const sub = newSub();
+    const sub = await newOwner();
     const key = randomUUID();
     let calls = 0;
     const fn = async () => json(++calls === 1 ? 400 : 200, {});
@@ -80,7 +80,7 @@ describe('withIdempotency', () => {
     expect((await withIdempotency(post(key, {}), sub, '{}', fn)).statusCode).toBe(200);
   });
   it('an abandoned in-progress lock can be taken over after the lease', async () => {
-    const sub = newSub();
+    const sub = await newOwner();
     const key = randomUUID();
     const t0 = 2_000_000_000;
     // Simulate a crash: start, never finish (fn never resolves within this test).
@@ -104,10 +104,14 @@ describe('withIdempotency', () => {
   });
   it('requires a UUID Idempotency-Key', async () => {
     const fn = async () => json(200, {});
-    await expect(withIdempotency(post(null, {}), newSub(), '{}', fn)).rejects.toMatchObject({
-      status: 428,
-    });
-    await expect(withIdempotency(post('abc', {}), newSub(), '{}', fn)).rejects.toMatchObject({
+    await expect(withIdempotency(post(null, {}), await newOwner(), '{}', fn)).rejects.toMatchObject(
+      {
+        status: 428,
+      },
+    );
+    await expect(
+      withIdempotency(post('abc', {}), await newOwner(), '{}', fn),
+    ).rejects.toMatchObject({
       status: 400,
     });
   });

@@ -1,4 +1,5 @@
-import { GetCommand, PutCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { activeWrite, readState } from '../lib/lifecycle.js';
+import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { computeCapabilities } from './capabilities.js';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
@@ -10,7 +11,7 @@ const FREE = {
   expiresAt: null,
   verifiedAt: null,
 };
-function defaultProfile(sub, now) {
+export function defaultProfile(sub, now) {
   return {
     pk: Keys.user(sub),
     sk: Keys.profile,
@@ -32,7 +33,7 @@ const toProfile = (p) => ({
   consent: p.consent,
   rev: p.rev,
 });
-export async function loadOrCreateProfile(sub) {
+export async function loadProfile(sub) {
   const got = await ddb().send(
     new GetCommand({
       TableName: tableName(),
@@ -41,21 +42,7 @@ export async function loadOrCreateProfile(sub) {
     }),
   );
   if (got.Item) return got.Item;
-  const fresh = defaultProfile(sub, new Date().toISOString());
-  try {
-    await ddb().send(
-      new PutCommand({
-        TableName: tableName(),
-        Item: fresh,
-        ConditionExpression: 'attribute_not_exists(pk)',
-      }),
-    );
-    return fresh;
-  } catch (e) {
-    if (!isConditionalFailure(e)) throw e;
-    // Concurrent first request created it; read the winner.
-    return loadOrCreateProfile(sub);
-  }
+  throw Errors.conflict('profile_missing', 'Explicit account registration is required');
 }
 /** Entitlement is written only by the billing module after store verification — never by clients. */
 async function loadEntitlement(sub) {
@@ -84,11 +71,12 @@ function clientPlatform(event) {
 export async function getMe(event, caller) {
   const platform = clientPlatform(event);
   const [profile, entitlement] = await Promise.all([
-    loadOrCreateProfile(caller.sub),
+    loadProfile(caller.sub),
     loadEntitlement(caller.sub),
   ]);
   const body = {
-    userId: caller.sub,
+    userId: caller.userId,
+    incarnation: caller.sub,
     profile: toProfile(profile),
     entitlement,
     capabilities: computeCapabilities(platform, entitlement),
@@ -105,7 +93,9 @@ function ifMatchRev(event) {
 export async function patchMe(event, caller) {
   const patch = parseBody(event, v1.PatchMeRequest);
   const expectedRev = ifMatchRev(event);
-  const current = await loadOrCreateProfile(caller.sub);
+  const accounting=await readState({pk:Keys.user(caller.sub),sk:'ACCOUNTUSAGE#POLICY'});
+  if(accounting && patch.tz!==undefined && patch.tz!==accounting.tz) throw Errors.conflict('account_timezone_fixed','Account timezone changes are not supported');
+  const current = await loadProfile(caller.sub);
   if (current.rev !== expectedRev)
     throw Errors.preconditionFailed(`profile is at rev ${current.rev}`);
   const next = {
@@ -158,8 +148,11 @@ export async function patchMe(event, caller) {
       });
     }
   }
+  // A profile timezone patch must also be safe if fixed-timezone setup committed after
+  // the preliminary policy read. Preserve handle/profile cancellation indexes above.
+  if(patch.tz!==undefined) items.push({ConditionCheck:{TableName:tableName(),Key:{pk:Keys.user(caller.sub),sk:'ACCOUNTUSAGE#POLICY'},ConditionExpression:'attribute_not_exists(pk) OR tz = :tz',ExpressionAttributeValues:{':tz':patch.tz}}});
   try {
-    await ddb().send(new TransactWriteCommand({ TransactItems: items }));
+    await activeWrite(caller.sub, new TransactWriteCommand({ TransactItems: items }));
   } catch (e) {
     if (!isConditionalFailure(e)) throw e;
     const reasons = e.CancellationReasons ?? [];
@@ -172,7 +165,8 @@ export async function patchMe(event, caller) {
   }
   const entitlement = await loadEntitlement(caller.sub);
   const body = {
-    userId: caller.sub,
+    userId: caller.userId,
+    incarnation: caller.sub,
     profile: toProfile(next),
     entitlement,
     capabilities: computeCapabilities(null, entitlement),

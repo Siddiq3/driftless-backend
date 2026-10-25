@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { route } from '../src/router.js';
-import { bodyOf, event, newSub } from './helpers.js';
+import { bodyOf, event, newAccount } from './helpers.js';
 const DEVICE = randomUUID();
 const day = (localDate, rev, over = {}) => ({
   localDate,
@@ -29,7 +29,7 @@ const sync = (sub, days, key = randomUUID()) =>
 const history = (sub, from, to) =>
   route(event({ path: '/v1/usage/history', sub, query: { from, to, includePersonal: 'true' } }));
 async function userWithSync() {
-  const sub = newSub();
+  const sub = await newAccount();
   await route(event({ path: '/v1/me', sub }));
   const r = await route(
     event({
@@ -83,7 +83,7 @@ describe('POST /v1/usage/sync', () => {
     ).toBe(400);
   });
   it('requires cloud-sync consent', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     await route(event({ path: '/v1/me', sub }));
     const r = await sync(sub, [day('2026-10-17', 1)]);
     expect(r.statusCode).toBe(403);
@@ -160,7 +160,7 @@ describe('POST /v1/usage/sync', () => {
   });
   it('a userId smuggled into a day is rejected by the strict schema', async () => {
     const sub = await userWithSync();
-    const bad = { ...day('2026-10-10', 1), userId: newSub() };
+    const bad = { ...day('2026-10-10', 1), userId: await newAccount() };
     expect((await sync(sub, [bad])).statusCode).toBe(400);
   });
 });
@@ -183,7 +183,7 @@ describe('GET /v1/usage/history', () => {
     expect((await history(sub, 'yesterday', '2026-10-01')).statusCode).toBe(400);
   });
   it('works without cloud-sync consent (reads are of data already stored)', async () => {
-    const sub = newSub();
+    const sub = await newAccount();
     const r = await history(sub, '2026-10-01', '2026-10-02');
     expect(r.statusCode).toBe(200);
     expect(v1.HistoryResponse.parse(bodyOf(r)).days).toEqual([]);

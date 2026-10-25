@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { route } from '../src/router.js';
-import { bodyOf, event, newSub } from './helpers.js';
+import { bodyOf, event, newAccount } from './helpers.js';
 const wrap = (sub, query = { period: 'daily', end: '2026-10-18' }) =>
   route(event({ path: '/v1/wrapped', sub, query }));
 async function user() {
-  const sub = newSub();
+  const sub = await newAccount();
   await route(event({ path: '/v1/me', sub }));
   await route(
     event({
@@ -47,7 +47,7 @@ async function sync(sub, views, localDate = '2026-10-18', deviceId = randomUUID(
 }
 describe('GET /v1/wrapped', () => {
   it('requires sync consent; validates period and completed date', async () => {
-    expect((await wrap(newSub())).statusCode).toBe(403);
+    expect((await wrap(await newAccount())).statusCode).toBe(403);
     const sub = await user();
     expect((await wrap(sub, { period: 'monthly', end: '2026-10-18' })).statusCode).toBe(400);
     expect((await wrap(sub, { period: 'daily', end: '2099-01-01' })).statusCode).toBe(400);

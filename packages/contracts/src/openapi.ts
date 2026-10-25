@@ -1,3 +1,4 @@
+import { AccountUsageHistory, AccountUsageHistoryQuery, AccountUsageConfigure, AccountUsageReconcile, AccountUsageReserve, AccountUsageResponse } from './account-usage.js';
 import { z } from 'zod';
 import { Problem } from './common.js';
 import * as v1 from './v1/index.js';
@@ -15,6 +16,24 @@ type Route = {
 
 /** Single source of truth for the v1 HTTP surface. The API router is tested against this list. */
 export const ROUTES: readonly Route[] = [
+  { method: 'get', path: '/v1/usage/account/history', summary: 'Retained account period summaries with requesting device baseline', query: AccountUsageHistoryQuery, response: AccountUsageHistory },
+  { method: 'get', path: '/v1/usage/account', summary: 'Authoritative account period and usage', response: AccountUsageResponse },
+  { method: 'put', path: '/v1/usage/account', summary: 'Fixed timezone setup or next-day limits', request: AccountUsageConfigure, response: AccountUsageResponse },
+  { method: 'post', path: '/v1/usage/account/reconcile', summary: 'Cumulative device accounting contributions', request: AccountUsageReconcile },
+  { method: 'post', path: '/v1/usage/account/reserve', summary: 'Reserve period allowance atomically', request: AccountUsageReserve, response: AccountUsageResponse },
+  {
+    method: 'get',
+    path: '/v1/account',
+    summary: 'Discover lifecycle without activating legacy data',
+    response: v1.AccountState,
+  },
+  {
+    method: 'post',
+    path: '/v1/account/register',
+    summary: 'Explicitly register an empty incarnation',
+    request: v1.RegisterAccountRequest,
+    response: v1.AccountState,
+  },
   {
     method: 'get',
     path: '/v1/wrapped',
@@ -219,6 +238,16 @@ export function buildOpenApi(): Record<string, unknown> {
         required: true,
         content: { 'application/json': { schema: schema(r.request) } },
       };
+    }
+    if (r.auth !== false && !['/v1/account', '/v1/account/register'].includes(r.path)) {
+      (op.parameters as unknown[]).push({
+        in: 'header',
+        name: 'X-Account-Incarnation',
+        required: !(r.path === '/v1/me' && r.method === 'get'),
+        description:
+          'Exact incarnation returned by lifecycle discovery/registration. Required for account data and deletion; never inferred for writes.',
+        schema: { type: 'string', format: 'uuid' },
+      });
     }
     (paths[r.path] ??= {})[r.method] = op;
   }

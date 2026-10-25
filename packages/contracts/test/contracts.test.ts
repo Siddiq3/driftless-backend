@@ -166,11 +166,15 @@ describe('OpenAPI', () => {
     for (const r of ROUTES) expect(doc.paths[r.path]?.[r.method]).toBeDefined();
   });
   it('declares Idempotency-Key on mutating idempotent routes', () => {
-    expect(doc.paths['/v1/usage/sync']?.post?.parameters).toHaveLength(1);
+    expect(doc.paths['/v1/usage/sync']?.post?.parameters).toEqual([
+      expect.objectContaining({ in: 'header', name: 'Idempotency-Key', required: true }),
+      expect.objectContaining({ in: 'header', name: 'X-Account-Incarnation', required: true }),
+    ]);
   });
   it('documents conditional goal writes and goal snapshot ETags', () => {
     expect(doc.paths['/v1/goals']?.put?.parameters).toEqual([
       expect.objectContaining({ in: 'header', name: 'If-Match', required: false }),
+      expect.objectContaining({ in: 'header', name: 'X-Account-Incarnation', required: true }),
     ]);
     const paths = buildOpenApi().paths as Record<
       string,

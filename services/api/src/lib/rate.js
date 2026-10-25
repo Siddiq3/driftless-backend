@@ -1,5 +1,6 @@
+import { activeWrite } from './lifecycle.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { ddb, isConditionalFailure, tableName } from './ddb.js';
+import { isConditionalFailure, tableName } from './ddb.js';
 import { HttpError } from './http.js';
 /**
  * Fixed-window per-user rate limit (THREAT_MODEL T8/T12). One atomic conditional increment;
@@ -8,7 +9,8 @@ import { HttpError } from './http.js';
 export async function rateLimit(sub, action, limit, windowSec, nowMs = Date.now()) {
   const window = Math.floor(nowMs / 1000 / windowSec);
   try {
-    await ddb().send(
+    await activeWrite(
+      sub,
       new UpdateCommand({
         TableName: tableName(),
         Key: { pk: `RATE#${sub}#${action}#${window}`, sk: 'RATE' },

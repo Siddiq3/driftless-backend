@@ -4,6 +4,26 @@ process.env.TABLE_NAME ??= 'driftless-test';
 process.env.GOOGLE_WEB_CLIENT_ID ??= 'test-web.apps.googleusercontent.com';
 // Test callers use contract UUIDs; Gateway fixtures contain their actual Google subjects.
 const subjects = new Map();
+const incarnations = new Map();
+export const ownerOf = (sub) => incarnations.get(sub) ?? sub;
+export async function newAccount() {
+  const sub = newSub();
+  const { route } = await import('../src/router.js');
+  const response = await route(
+    event({
+      method: 'POST',
+      path: '/v1/account/register',
+      sub,
+      body: { registrationId: randomUUID(), expectedIncarnation: null },
+    }),
+  );
+  if (response.statusCode !== 200) throw new Error(`Fixture registration failed: ${response.body}`);
+  incarnations.set(sub, bodyOf(response).incarnation);
+  return sub;
+}
+export async function newOwner() {
+  return ownerOf(await newAccount());
+}
 export const newSub = () => {
   const googleSub = BigInt('0x' + randomBytes(9).toString('hex')).toString();
   const id = googleUserId(googleSub);
@@ -29,7 +49,11 @@ export function event(o) {
     routeKey: '$default',
     rawPath: o.path,
     rawQueryString: '',
-    headers: { 'content-type': 'application/json', ...o.headers },
+    headers: {
+      'content-type': 'application/json',
+      ...(incarnations.has(callerSub) ? { 'x-account-incarnation': ownerOf(callerSub) } : {}),
+      ...o.headers,
+    },
     queryStringParameters: o.query,
     body,
     isBase64Encoded: false,

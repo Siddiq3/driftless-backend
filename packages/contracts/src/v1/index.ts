@@ -38,8 +38,19 @@ export const Profile = z.object({
 });
 export type Profile = z.infer<typeof Profile>;
 
+/** Lifecycle discovery never activates or imports a legacy dataset. */
+export const AccountState = z.object({
+  state: z.enum(['active', 'deleting', 'deleted', 'legacy_quarantined']),
+  incarnation: Uuid.nullable(),
+});
+export const RegisterAccountRequest = z.strictObject({
+  registrationId: Uuid,
+  expectedIncarnation: Uuid.nullable(),
+});
+
 export const MeResponse = z.object({
   userId: z.string(),
+  incarnation: Uuid,
   profile: Profile,
   entitlement: Entitlement,
   capabilities: Capabilities,
@@ -207,7 +218,8 @@ export const ChallengeCreate = z
 
 export const ChallengeSummary = z.object({
   challengeId: Uuid,
-  ownerId: z.string(),
+  /** Null after the creator has deleted their account; other memberships remain intact. */
+  ownerId: z.string().nullable(),
   title: DisplayName,
   metric: z.enum(['fewest_views', 'fewest_minutes', 'goal_days']),
   startDate: LocalDate,
@@ -252,7 +264,7 @@ export const VerifyResponse = z.object({ entitlement: Entitlement });
 export const DeviceRegister = z.strictObject({
   deviceId: Uuid,
   platform: Platform,
-  pushToken: z.string().min(16).max(4096),
+  pushToken: z.string().min(16).max(4096).optional(),
 });
 
 /* ───────────── Account ───────────── */
