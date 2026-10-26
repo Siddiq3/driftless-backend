@@ -1,4 +1,11 @@
 import {
+  postBattleInvite,
+  getBattleInvite,
+  acceptBattleInvite,
+  getBattleDaily,
+} from './modules/battle-links.js';
+import { joinPage, associationFile } from './modules/join-page.js';
+import {
   getAccountUsageHistory,
   getAccountUsage,
   configureAccountUsage,
@@ -43,6 +50,10 @@ import { getUsageHistory, postUsageSync } from './modules/usage.js';
 import { getHealth } from './modules/health.js';
 /** Routes implemented so far. Routes in contracts.ROUTES not listed here return 404 (by design). */
 export const IMPLEMENTED = {
+  'POST /v1/battles/invites': postBattleInvite,
+  'GET /v1/battles/invites/{code}': getBattleInvite,
+  'POST /v1/battles/invites/{code}/accept': acceptBattleInvite,
+  'GET /v1/battles/daily': getBattleDaily,
   'GET /v1/usage/account': getAccountUsage,
   'GET /v1/usage/account/history': getAccountUsageHistory,
   'PUT /v1/usage/account': configureAccountUsage,
@@ -109,6 +120,23 @@ export async function route(event) {
   let label = 'unmatched';
   let status = 500;
   try {
+    const join = method === 'GET' && /^\/join\/([A-HJ-NP-Z2-9]{10})$/.exec(event.rawPath);
+    if (join) {
+      label = 'GET /join/{code}';
+      const res = await joinPage(join[1]);
+      status = res.statusCode;
+      return res;
+    }
+    if (
+      method === 'GET' &&
+      ['/.well-known/assetlinks.json', '/.well-known/apple-app-site-association'].includes(
+        event.rawPath,
+      )
+    ) {
+      label = 'GET /.well-known/association';
+      status = 200;
+      return associationFile(event.rawPath);
+    }
     if (key === 'GET /health') {
       label = key;
       const res = await getHealth();

@@ -200,6 +200,17 @@ export const FriendRespond = z.strictObject({ userId: Uuid, accept: z.boolean() 
 export const FriendRemove = z.strictObject({ userId: Uuid });
 export const FriendRequestResult = z.object({ friend: Friend });
 
+/** Link-based, ongoing daily battle sharing. Neither action changes global friend sharing. */
+export const BattleLinkConsent = z.strictObject({ scoreConsent: z.literal(true) });
+export const BattleLinkCode = z.string().regex(/^[A-HJ-NP-Z2-9]{10}$/);
+export const BattleLinkPreview = z.object({
+  code: BattleLinkCode,
+  inviterName: z.string(),
+  inviterUserId: z.string(),
+  isSelf: z.boolean(),
+  expiresAt: z.iso.datetime(),
+});
+
 /* ───────────── Challenges ───────────── */
 
 export const ChallengeCreate = z
