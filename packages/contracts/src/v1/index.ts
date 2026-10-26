@@ -210,12 +210,34 @@ export const ChallengeCreate = z
     endDate: LocalDate,
     tz: TimeZone,
     maxMembers: z.int().min(2).max(50),
+    targetUserId: Uuid.optional(),
+    operationId: Uuid.optional(),
+    scoreConsent: z.literal(true).optional(),
   })
   .refine((c) => c.endDate >= c.startDate, {
     message: 'endDate before startDate',
     path: ['endDate'],
-  });
+  })
+  .refine(
+    (c) =>
+      !c.targetUserId || (c.maxMembers === 2 && Boolean(c.operationId) && c.scoreConsent === true),
+    {
+      message: 'Direct battles require two places, an operation ID and battle-only score consent',
+      path: ['targetUserId'],
+    },
+  );
 
+export const BattleInvitationState = z.enum([
+  'pending',
+  'accepted',
+  'declined',
+  'cancelled',
+  'expired',
+  'unavailable',
+]);
+export const ChallengeJoin = z.strictObject({ scoreConsent: z.literal(true).optional() });
+export const BattleInvitationAction = z.strictObject({ action: z.enum(['decline', 'cancel']) });
+export const BattleScoreConsent = z.strictObject({ share: z.boolean() });
 export const ChallengeSummary = z.object({
   challengeId: Uuid,
   /** Null after the creator has deleted their account; other memberships remain intact. */
@@ -227,9 +249,16 @@ export const ChallengeSummary = z.object({
   tz: TimeZone,
   maxMembers: z.int().min(2).max(50),
   memberCount: z.int().min(0),
+  targetUserId: Uuid.optional(),
+  invitationState: BattleInvitationState.optional(),
+  ownerName: z.string().nullable().optional(),
+  myScoreConsent: z.boolean().optional(),
 });
 export type ChallengeSummary = z.infer<typeof ChallengeSummary>;
-export const ChallengesResponse = z.object({ challenges: z.array(ChallengeSummary) });
+export const ChallengesResponse = z.object({
+  challenges: z.array(ChallengeSummary),
+  invitations: z.array(ChallengeSummary).optional(),
+});
 
 export const LeaderboardEntry = z.object({
   rank: z.int().min(1),
@@ -238,12 +267,32 @@ export const LeaderboardEntry = z.object({
   score: z.number(),
   /** 'device' = from verified device aggregates; 'self' = self-reported check-in (iOS). */
   scoreSource: z.enum(['device', 'self']),
+  availableDays: z.int().min(0).optional(),
 });
 export const LeaderboardResponse = z.object({
   challengeId: Uuid,
   asOf: LocalDate,
   entries: z.array(LeaderboardEntry).max(50),
-  /** Members who haven't turned on sharing with friends; they are never ranked or shown. */
+  participants: z
+    .array(
+      z.object({
+        userId: z.string(),
+        handle: Handle.nullable(),
+        status: z.enum([
+          'ready',
+          'no_data',
+          'sharing_off',
+          'expired',
+          'unavailable',
+          'awaiting_opponent',
+        ]),
+        availableDays: z.int().min(0),
+        expectedDays: z.int().min(0),
+      }),
+    )
+    .max(50)
+    .optional(),
+  /** Members without a currently authorized usable score. Missing is never zero. */
   hiddenMembers: z.int().min(0).optional(),
 });
 export type LeaderboardResponse = z.infer<typeof LeaderboardResponse>;

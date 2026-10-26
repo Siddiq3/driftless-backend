@@ -159,7 +159,8 @@ export const ROUTES: readonly Route[] = [
   {
     method: 'post',
     path: '/v1/challenges/{id}/join',
-    summary: 'Join a friend’s challenge',
+    summary: 'Join a friend’s challenge; targeted invitation acceptance needs score consent',
+    request: v1.ChallengeJoin,
     response: v1.ChallengeSummary,
   },
   {
@@ -167,14 +168,28 @@ export const ROUTES: readonly Route[] = [
     path: '/v1/challenges/{id}/leave',
     summary: 'Leave a challenge',
   },
+  {
+    method: 'post',
+    path: '/v1/challenges/{id}/invitation',
+    summary: 'Decline a targeted invitation or cancel your direct battle',
+    request: v1.BattleInvitationAction,
+    response: v1.ChallengeSummary,
+  },
+  {
+    method: 'put',
+    path: '/v1/challenges/{id}/score-consent',
+    summary: 'Set battle-only score visibility until the end date',
+    request: v1.BattleScoreConsent,
+    response: v1.ChallengeSummary,
+  },
   { method: 'delete', path: '/v1/devices/{id}', summary: 'Unregister a push device' },
   {
     method: 'post',
     path: '/v1/challenges',
-    summary: 'Create challenge',
+    summary:
+      'Create challenge; operationId durably deduplicates creation (required for direct battles)',
     request: v1.ChallengeCreate,
     response: v1.ChallengeSummary,
-    idempotent: true,
   },
   {
     method: 'get',

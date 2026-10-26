@@ -1,12 +1,17 @@
-import { activeWrite, assertActive } from '../lib/lifecycle.js';
-import { randomUUID } from 'node:crypto';
+import {
+  readState,
+  accountKey,
+  incarnationKey,
+  activeWrite,
+  assertActive,
+} from '../lib/lifecycle.js';
+import { createHash, randomUUID } from 'node:crypto';
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
 import { daysBetween, evaluateDay, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { ddb, isConditionalFailure, Keys, tableName } from '../lib/ddb.js';
-import { Errors, json, parseBody } from '../lib/http.js';
+import { Errors, HttpError, json, parseBody } from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
-import { areFriends } from './friends.js';
 import { batchGet } from '../lib/batch.js';
 import { comparisonCount } from '../lib/comparison-count.js';
 export const MAX_CHALLENGE_DAYS = 31;
@@ -37,7 +42,9 @@ async function getMeta(id) {
   return r.Item;
 }
 async function isMember(id, sub) {
-  const r = await ddb().send(new GetCommand({ TableName: tableName(), Key: memberKey(id, sub) }));
+  const r = await ddb().send(
+    new GetCommand({ TableName: tableName(), Key: memberKey(id, sub), ConsistentRead: true }),
+  );
   return Boolean(r.Item);
 }
 function memberItem(id, sub, ttl) {
@@ -50,62 +57,322 @@ function memberItem(id, sub, ttl) {
     ttl,
   };
 }
+// Direct invitations live in the same challenge/membership model, owned by incarnations.
+const inviteKey = (id, target) => ({ pk: Keys.user(target), sk: `BATTLEINVITE#${id}` });
+const operationKey = (sub, id) => ({ pk: Keys.user(sub), sk: `BATTLEOP#${id}` });
+const pairKey = (sub, target) => ({ pk: Keys.user(sub), sk: `BATTLEPAIR#${target}` });
+const expired = (m) => localDateOf(Date.now(), m.tz) > m.endDate;
+const put = (Item, extra = {}) => ({ Put: { TableName: tableName(), Item, ...extra } });
+const condition = (Key, expression, values) => ({
+  ConditionCheck: {
+    TableName: tableName(),
+    Key,
+    ConditionExpression: expression,
+    ExpressionAttributeValues: values,
+  },
+});
+const friendshipKey = (a, b) => ({ pk: Keys.user(a), sk: `FRIEND#${b}` });
+async function friendship(a, b) {
+  const [left, right] = await Promise.all([
+    readState(friendshipKey(a, b)),
+    readState(friendshipKey(b, a)),
+  ]);
+  if (left?.status !== 'accepted' || right?.status !== 'accepted')
+    throw Errors.conflict('friend_unavailable', 'This friend is no longer available for a battle');
+  return { left: left.since, right: right.since };
+}
+const friendshipGuards = (a, b, since) =>
+  [
+    condition(friendshipKey(a, b), '#s = :accepted AND since = :since', {
+      ':accepted': 'accepted',
+      ':since': since.left,
+    }),
+    condition(friendshipKey(b, a), '#s = :accepted AND since = :since', {
+      ':accepted': 'accepted',
+      ':since': since.right,
+    }),
+  ].map((c) => {
+    c.ConditionCheck.ExpressionAttributeNames = { '#s': 'status' };
+    return c;
+  });
+async function directStatus(m) {
+  if (!m.targetIncarnation) return null;
+  if (!m.ownerId) return 'unavailable';
+  const [owner, target] = await Promise.all([
+    readState(incarnationKey(m.ownerId)),
+    readState(incarnationKey(m.targetIncarnation)),
+  ]);
+  if (owner?.state !== 'active' || target?.state !== 'active') return 'unavailable';
+  if (['declined', 'cancelled', 'unavailable'].includes(m.invitationState))
+    return m.invitationState;
+  try {
+    const since = await friendship(m.ownerId, m.targetIncarnation);
+    if (since.left !== m.friendshipSince.left || since.right !== m.friendshipSince.right)
+      return 'unavailable';
+  } catch (e) {
+    if (e instanceof HttpError && e.code === 'friend_unavailable') return 'unavailable';
+    throw e;
+  }
+  return expired(m) ? 'expired' : m.invitationState;
+}
+async function summary(m, caller) {
+  const base = toSummary(m);
+  const member = await readState(memberKey(m.challengeId, caller.sub));
+  if (member)
+    base.myScoreConsent = member.scoreConsentVersion === 1 && member.scoreConsent === true;
+  if (m.targetIncarnation) {
+    if (caller.sub !== m.ownerId && caller.sub !== m.targetIncarnation) throw Errors.notFound();
+    base.targetUserId = m.targetUserId;
+    base.invitationState = await directStatus(m);
+    const owner =
+      base.invitationState === 'unavailable'
+        ? null
+        : await readState({ pk: Keys.user(m.ownerId), sk: Keys.profile });
+    base.ownerName = owner?.displayName ?? owner?.handle ?? null;
+  }
+  return base;
+}
+async function sendSummary(m, caller) {
+  return json(200, await summary(m, caller));
+}
+function assertDirectUsable(status) {
+  if (!['pending', 'accepted'].includes(status))
+    throw Errors.conflict(
+      `battle_${status}`,
+      `This battle is ${status}. Start a new battle if needed.`,
+    );
+}
+async function queryOwned(sub, prefix) {
+  const items = [];
+  let start;
+  do {
+    const r = await ddb().send(
+      new QueryCommand({
+        TableName: tableName(),
+        ConsistentRead: true,
+        KeyConditionExpression: 'pk = :pk AND begins_with(sk,:prefix)',
+        ExpressionAttributeValues: { ':pk': Keys.user(sub), ':prefix': prefix },
+        ExclusiveStartKey: start,
+      }),
+    );
+    items.push(...(r.Items ?? []));
+    start = r.LastEvaluatedKey;
+  } while (start);
+  return items;
+}
 export async function postChallenge(event, caller) {
   const c = parseBody(event, v1.ChallengeCreate);
+  if (
+    c.targetUserId &&
+    (!c.operationId || !c.scoreConsent || c.maxMembers !== 2 || c.targetUserId === caller.userId)
+  )
+    throw Errors.badRequest(
+      'A direct battle requires a different friend, two places, an operation ID and battle score consent',
+    );
+  const fingerprint = createHash('sha256').update(JSON.stringify(c)).digest('hex');
+  const replay = async () => {
+    const op = c.operationId ? await readState(operationKey(caller.sub, c.operationId)) : null;
+    if (!op) return null;
+    if (op.fingerprint !== fingerprint)
+      throw Errors.conflict('operation_reuse', 'Use the original battle request when retrying');
+    return sendSummary(await getMeta(op.challengeId), caller);
+  };
+  const previous = await replay();
+  if (previous) return previous;
   await rateLimit(caller.sub, 'challenge_create', 5, 86_400);
   const length = daysBetween(c.startDate, c.endDate) + 1;
   if (length > MAX_CHALLENGE_DAYS)
     throw Errors.badRequest(`a challenge can last at most ${MAX_CHALLENGE_DAYS} days`);
   const today = localDateOf(Date.now(), c.tz);
   if (daysBetween(today, c.startDate) < -1) throw Errors.badRequest('start date is in the past');
+  if (c.endDate < today) throw Errors.badRequest('challenge has already ended');
+  let target, since;
+  if (c.targetUserId) {
+    const state = await readState(accountKey(c.targetUserId));
+    if (state?.state !== 'active')
+      throw Errors.conflict(
+        'friend_unavailable',
+        'This friend is no longer available for a battle',
+      );
+    target = state.incarnation;
+    since = await friendship(caller.sub, target);
+  }
   const id = randomUUID();
   const ttl = Math.floor(Date.parse(`${c.endDate}T00:00:00Z`) / 1000) + 90 * 86_400;
+  const { operationId, scoreConsent, targetUserId, ...fields } = c;
   const meta = {
     ...metaKey(id),
     challengeId: id,
     ownerId: caller.sub,
     ownerUserId: caller.userId,
-    ...c,
+    ...fields,
     memberCount: 1,
     ttl,
+    ...(target
+      ? {
+          targetIncarnation: target,
+          targetUserId,
+          invitationState: 'pending',
+          friendshipSince: since,
+        }
+      : {}),
   };
-  await activeWrite(
-    caller.sub,
-    new TransactWriteCommand({
-      TransactItems: [
-        {
-          Put: {
-            TableName: tableName(),
-            Item: meta,
-            ConditionExpression: 'attribute_not_exists(pk)',
-          },
-        },
-        { Put: { TableName: tableName(), Item: memberItem(id, caller.sub, ttl) } },
-        {
-          Put: { TableName: tableName(), Item: { ...journalKey(id, caller.sub), challengeId: id } },
-        },
-        {
-          Put: {
-            TableName: tableName(),
-            Item: { pk: Keys.user(caller.sub), sk: `OWNEDCHALLENGE#${id}`, challengeId: id },
-          },
-        },
-      ],
-    }),
-  );
-  return json(200, toSummary(meta));
+  const member = {
+    ...memberItem(id, caller.sub, ttl),
+    ...(scoreConsent ? { scoreConsentVersion: 1, scoreConsent: true } : {}),
+  };
+  const items = [
+    put(meta, { ConditionExpression: 'attribute_not_exists(pk)' }),
+    put(member),
+    put({ ...journalKey(id, caller.sub), challengeId: id }),
+    put({ pk: Keys.user(caller.sub), sk: `OWNEDCHALLENGE#${id}`, challengeId: id }),
+  ];
+  if (operationId)
+    items.push(
+      put(
+        { ...operationKey(caller.sub, operationId), challengeId: id, fingerprint },
+        { ConditionExpression: 'attribute_not_exists(pk)' },
+      ),
+    );
+  if (target) {
+    items.push(
+      put({ ...inviteKey(id, target), challengeId: id, ownerId: caller.sub, ttl }),
+      ...friendshipGuards(caller.sub, target, since),
+      condition(accountKey(targetUserId), '#s = :active AND incarnation = :inc', {
+        ':active': 'active',
+        ':inc': target,
+      }),
+    );
+    items[items.length - 1].ConditionCheck.ExpressionAttributeNames = { '#s': 'state' };
+    // One outstanding invitation per creator/target pair, regardless of repeated operation IDs.
+    const pair = await readState(pairKey(caller.sub, target));
+    if (pair) {
+      const existing = await readState(metaKey(pair.challengeId));
+      if (existing && ['pending', 'accepted'].includes(await directStatus(existing)))
+        throw Errors.conflict(
+          'battle_exists',
+          'A battle with this friend is already active. Open Your battles.',
+        );
+    }
+    items.push(
+      put(
+        { ...pairKey(caller.sub, target), challengeId: id },
+        pair
+          ? {
+              ConditionExpression: 'challengeId = :previous',
+              ExpressionAttributeValues: { ':previous': pair.challengeId },
+            }
+          : { ConditionExpression: 'attribute_not_exists(pk)' },
+      ),
+    );
+  }
+  try {
+    await activeWrite(
+      caller.sub,
+      new TransactWriteCommand({ TransactItems: items }),
+      target ? [target] : [],
+    );
+  } catch (e) {
+    if (!isConditionalFailure(e)) throw e;
+    const won = await replay();
+    if (won) return won;
+    throw Errors.conflict(
+      'battle_changed',
+      'Friendship or invitation changed. Refresh Your battles before retrying.',
+    );
+  }
+  return sendSummary(meta, caller);
 }
 export async function postJoin(event, caller) {
-  const id = idParam(event);
-  const meta = await getMeta(id);
+  const id = idParam(event),
+    meta = await getMeta(id);
+  const body = parseBody({ ...event, body: event.body || '{}' }, v1.ChallengeJoin);
   if (!meta.ownerId) throw Errors.notFound();
   await assertActive(meta.ownerId);
-  // Friends-only (D-011): you can join only challenges created by a friend.
-  if (meta.ownerId !== caller.sub && !(await areFriends(caller.sub, meta.ownerId)))
+  if (meta.targetIncarnation && caller.sub !== meta.targetIncarnation) throw Errors.notFound();
+  const since =
+    caller.sub === meta.ownerId
+      ? null
+      : await friendship(caller.sub, meta.ownerId).catch((e) => {
+          if (!meta.targetIncarnation && e instanceof HttpError && e.code === 'friend_unavailable')
+            throw Errors.notFound();
+          throw e;
+        });
+  if (meta.targetIncarnation) {
+    assertDirectUsable(await directStatus(meta));
+    if (!body.scoreConsent)
+      throw Errors.badRequest('Accepting a direct battle requires battle-only score consent');
+  }
+  if (await isMember(id, caller.sub)) return sendSummary(meta, caller);
+  if (expired(meta)) throw Errors.conflict('challenge_over', 'this challenge has ended');
+  const update = {
+    Update: {
+      TableName: tableName(),
+      Key: metaKey(id),
+      UpdateExpression: meta.targetIncarnation
+        ? 'SET memberCount = memberCount + :one, invitationState = :accepted'
+        : 'SET memberCount = memberCount + :one',
+      ConditionExpression: meta.targetIncarnation
+        ? 'memberCount < maxMembers AND invitationState = :pending'
+        : 'memberCount < maxMembers',
+      ExpressionAttributeValues: {
+        ':one': 1,
+        ...(meta.targetIncarnation ? { ':accepted': 'accepted', ':pending': 'pending' } : {}),
+      },
+    },
+  };
+  const items = [
+    update,
+    put(
+      {
+        ...memberItem(id, caller.sub, meta.ttl),
+        ...(body.scoreConsent ? { scoreConsentVersion: 1, scoreConsent: true } : {}),
+      },
+      { ConditionExpression: 'attribute_not_exists(pk)' },
+    ),
+    put({ ...journalKey(id, caller.sub), challengeId: id }),
+    ...(since ? friendshipGuards(caller.sub, meta.ownerId, since) : []),
+  ];
+  try {
+    await activeWrite(caller.sub, new TransactWriteCommand({ TransactItems: items }), [
+      meta.ownerId,
+    ]);
+  } catch (e) {
+    if (!isConditionalFailure(e)) throw e;
+    const winner = await getMeta(id);
+    if (
+      (await isMember(id, caller.sub)) &&
+      (!meta.targetIncarnation || (await directStatus(winner)) === 'accepted')
+    )
+      return sendSummary(winner, caller);
+    throw Errors.conflict(
+      meta.targetIncarnation ? 'challenge_changed' : 'challenge_full',
+      'This invitation changed, is full or is no longer available. Refresh before retrying.',
+    );
+  }
+  return sendSummary(
+    {
+      ...meta,
+      memberCount: meta.memberCount + 1,
+      ...(meta.targetIncarnation ? { invitationState: 'accepted' } : {}),
+    },
+    caller,
+  );
+}
+export async function postInvitation(event, caller) {
+  const id = idParam(event),
+    m = await getMeta(id);
+  const { action } = parseBody(event, v1.BattleInvitationAction);
+  if (
+    !m.targetIncarnation ||
+    (action === 'cancel' ? caller.sub !== m.ownerId : caller.sub !== m.targetIncarnation)
+  )
     throw Errors.notFound();
-  if (await isMember(id, caller.sub)) return json(200, toSummary(meta));
-  if (localDateOf(Date.now(), meta.tz) > meta.endDate)
-    throw Errors.conflict('challenge_over', 'this challenge has ended');
+  const next = action === 'cancel' ? 'cancelled' : 'declined';
+  if (m.invitationState === next) return sendSummary(m, caller);
+  assertDirectUsable(await directStatus(m));
+  if (action === 'decline' && m.invitationState !== 'pending')
+    throw Errors.conflict('invitation_changed', 'An accepted battle must be left, not declined');
   try {
     await activeWrite(
       caller.sub,
@@ -115,81 +382,131 @@ export async function postJoin(event, caller) {
             Update: {
               TableName: tableName(),
               Key: metaKey(id),
-              UpdateExpression: 'SET memberCount = memberCount + :one',
-              ConditionExpression: 'memberCount < maxMembers',
-              ExpressionAttributeValues: { ':one': 1 },
-            },
-          },
-          {
-            Put: {
-              TableName: tableName(),
-              Item: memberItem(id, caller.sub, meta.ttl),
-              ConditionExpression: 'attribute_not_exists(pk)',
-            },
-          },
-          {
-            Put: {
-              TableName: tableName(),
-              Item: { ...journalKey(id, caller.sub), challengeId: id },
+              UpdateExpression: 'SET invitationState = :next',
+              ConditionExpression: 'invitationState = :previous',
+              ExpressionAttributeValues: { ':next': next, ':previous': m.invitationState },
             },
           },
         ],
       }),
-      [meta.ownerId],
+      [m.ownerId, m.targetIncarnation],
     );
   } catch (e) {
-    if (isConditionalFailure(e)) throw Errors.conflict('challenge_full', 'this challenge is full');
-    throw e;
+    if (!isConditionalFailure(e)) throw e;
+    const winner = await getMeta(id);
+    if (winner.invitationState !== next)
+      throw Errors.conflict('invitation_changed', 'Invitation changed; refresh before retrying');
   }
-  return json(200, toSummary({ ...meta, memberCount: meta.memberCount + 1 }));
+  return sendSummary(await getMeta(id), caller);
 }
-export async function postLeave(event, caller) {
-  const id = idParam(event);
+export async function putScoreConsent(event, caller) {
+  const id = idParam(event),
+    m = await getMeta(id),
+    { share } = parseBody(event, v1.BattleScoreConsent);
+  if (!(await isMember(id, caller.sub))) throw Errors.notFound();
+  if (share) {
+    if (expired(m)) throw Errors.conflict('challenge_over', 'This battle has ended');
+    if (m.targetIncarnation) assertDirectUsable(await directStatus(m));
+  }
+  const guards = [];
+  if (share && m.targetIncarnation) {
+    guards.push(...friendshipGuards(m.ownerId, m.targetIncarnation, m.friendshipSince), {
+      ConditionCheck: {
+        TableName: tableName(),
+        Key: metaKey(id),
+        ConditionExpression: 'invitationState = :previous',
+        ExpressionAttributeValues: { ':previous': m.invitationState },
+      },
+    });
+  } else if (share && m.ownerId && caller.sub !== m.ownerId) {
+    const since = await friendship(caller.sub, m.ownerId);
+    guards.push(...friendshipGuards(caller.sub, m.ownerId, since));
+  }
   try {
     await activeWrite(
       caller.sub,
       new TransactWriteCommand({
         TransactItems: [
           {
-            Delete: {
+            Update: {
               TableName: tableName(),
               Key: memberKey(id, caller.sub),
+              UpdateExpression: 'SET scoreConsent = :share, scoreConsentVersion = :version',
               ConditionExpression: 'attribute_exists(pk)',
+              ExpressionAttributeValues: { ':share': share, ':version': 1 },
             },
           },
-          {
-            Update: {
-              TableName: tableName(),
-              Key: metaKey(id),
-              UpdateExpression: 'SET memberCount = memberCount - :one',
-              ConditionExpression: 'memberCount > :zero',
-              ExpressionAttributeValues: { ':one': 1, ':zero': 0 },
-            },
-          },
-          { Delete: { TableName: tableName(), Key: journalKey(id, caller.sub) } },
+          ...guards,
         ],
       }),
+      share && m.ownerId ? [m.ownerId, ...(m.targetIncarnation ? [m.targetIncarnation] : [])] : [],
     );
   } catch (e) {
-    if (isConditionalFailure(e)) throw Errors.notFound();
-    throw e;
+    if (!isConditionalFailure(e)) throw e;
+    throw Errors.conflict(
+      'battle_changed',
+      'This battle changed. Refresh before changing score sharing.',
+    );
+  }
+  return sendSummary(m, caller);
+}
+export async function postLeave(event, caller) {
+  const id = idParam(event),
+    m = await getMeta(id);
+  if (!(await isMember(id, caller.sub))) {
+    if (m.targetIncarnation && [m.ownerId, m.targetIncarnation].includes(caller.sub))
+      return json(200, { ok: true });
+    throw Errors.notFound();
+  }
+  const items = [
+    {
+      Delete: {
+        TableName: tableName(),
+        Key: memberKey(id, caller.sub),
+        ConditionExpression: 'attribute_exists(pk)',
+      },
+    },
+    {
+      Update: {
+        TableName: tableName(),
+        Key: metaKey(id),
+        UpdateExpression: m.targetIncarnation
+          ? 'SET memberCount = memberCount - :one, invitationState = :cancelled'
+          : 'SET memberCount = memberCount - :one',
+        ConditionExpression: 'memberCount > :zero',
+        ExpressionAttributeValues: {
+          ':one': 1,
+          ':zero': 0,
+          ...(m.targetIncarnation ? { ':cancelled': 'cancelled' } : {}),
+        },
+      },
+    },
+    { Delete: { TableName: tableName(), Key: journalKey(id, caller.sub) } },
+  ];
+  try {
+    await activeWrite(caller.sub, new TransactWriteCommand({ TransactItems: items }));
+  } catch (e) {
+    if (!isConditionalFailure(e) || (await isMember(id, caller.sub))) throw e;
   }
   return json(200, { ok: true });
 }
-export async function getChallenges(_e, caller) {
-  const r = await ddb().send(
-    new QueryCommand({
-      TableName: tableName(),
-      IndexName: 'gsi1',
-      KeyConditionExpression: 'gsi1pk = :p AND begins_with(gsi1sk, :c)',
-      ExpressionAttributeValues: { ':p': `MEMBEROF#${caller.sub}`, ':c': 'CHAL#' },
-    }),
-  );
-  const ids = (r.Items ?? []).map((i) => String(i.gsi1sk).slice('CHAL#'.length));
-  if (ids.length === 0) return json(200, { challenges: [] });
-  const got = await batchGet(ids.slice(0, 100).map(metaKey));
-  const challenges = got.map(toSummary).sort((a, b) => (a.endDate < b.endDate ? 1 : -1));
-  return json(200, { challenges });
+export async function getChallenges(_event, caller) {
+  const [own, inbox] = await Promise.all([
+    queryOwned(caller.sub, 'MEMBERSHIP#'),
+    queryOwned(caller.sub, 'BATTLEINVITE#'),
+  ]);
+  const load = async (rows) => {
+    const out = [];
+    for (const row of rows.slice(0, 100)) {
+      const m = await readState(metaKey(row.challengeId));
+      if (m) out.push(await summary(m, caller));
+    }
+    return out.sort((a, b) => b.endDate.localeCompare(a.endDate));
+  };
+  const challenges = await load(own);
+  const joined = new Set(challenges.map((c) => c.challengeId));
+  const invitations = await load(inbox.filter((row) => !joined.has(row.challengeId)));
+  return json(200, { challenges, invitations });
 }
 async function memberDays(sub, from, to) {
   const rows = [];
@@ -200,6 +517,7 @@ async function memberDays(sub, from, to) {
         TableName: tableName(),
         ExclusiveStartKey: start,
         KeyConditionExpression: 'pk = :pk AND sk BETWEEN :a AND :b',
+        ConsistentRead: true,
         ExpressionAttributeValues: {
           ':pk': Keys.user(sub),
           ':a': Keys.dayRangeStart(from),
@@ -272,63 +590,171 @@ export function scoreMember(metric, days, goalMinutes) {
 }
 export async function getLeaderboard(event, caller) {
   const id = idParam(event);
-  if (!(await isMember(id, caller.sub))) throw Errors.notFound(); // non-members can't see members
+  const requester = await readState(memberKey(id, caller.sub));
+  if (!requester) throw Errors.notFound();
   await rateLimit(caller.sub, 'leaderboard', 120, 3600);
   const meta = await getMeta(id);
   const today = localDateOf(Date.now(), meta.tz);
   const to = today < meta.endDate ? today : meta.endDate;
+  const expectedDays = meta.startDate > to ? 0 : daysBetween(meta.startDate, to) + 1;
+  const direct = meta.targetIncarnation ? await directStatus(meta) : null;
   const members = await ddb().send(
     new QueryCommand({
       TableName: tableName(),
-      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :m)',
+      ConsistentRead: true,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk,:m)',
       ExpressionAttributeValues: { ':pk': `CHAL#${id}`, ':m': 'MEMBER#' },
     }),
   );
-  const subs = (members.Items ?? []).map((m) => m.sub).slice(0, 50);
-  const prof = await batchGet(
-    subs.map((s) => ({ pk: Keys.user(s), sk: Keys.profile })),
+  const rows = (members.Items ?? []).slice(0, 50);
+  const profiles = await batchGet(
+    rows.map((m) => ({ pk: Keys.user(m.sub), sk: Keys.profile })),
     true,
   );
-  const profiles = new Map(prof.map((p) => [String(p.pk).slice('USER#'.length), p]));
-  const scored = [];
-  // Bound fan-out while avoiding a network round trip per member in series.
-  for (let offset = 0; offset < subs.length; offset += 10) {
+  const prof = new Map(profiles.map((p) => [String(p.pk).slice(5), p]));
+  const participants = [],
+    scored = [];
+  const requesterRevoked = requester.scoreConsentVersion === 1 && !requester.scoreConsent;
+  const requesterUnavailable =
+    !direct && requester.scoreConsentVersion === 1 && meta.ownerId && caller.sub !== meta.ownerId
+      ? await friendship(caller.sub, meta.ownerId).then(
+          () => false,
+          (e) => {
+            if (e instanceof HttpError && e.code === 'friend_unavailable') return true;
+            throw e;
+          },
+        )
+      : false;
+  for (let offset = 0; offset < rows.length; offset += 10) {
     const batch = await Promise.all(
-      subs.slice(offset, offset + 10).map(async (sub) => {
-        const p = profiles.get(sub);
+      rows.slice(offset, offset + 10).map(async (member) => {
+        const sub = member.sub,
+          p = prof.get(sub),
+          scoped = member.scoreConsentVersion === 1;
+        let status = requesterUnavailable ? 'unavailable' : null;
         if (
           !p?.handle ||
           !(await assertActive(sub).then(
             () => true,
             () => false,
-          )) ||
-          !p.consent?.cloudSync ||
-          !p.consent.shareWithFriends ||
-          meta.startDate > to
+          ))
         )
-          return null;
+          status = 'unavailable';
+        else if (direct && !['pending', 'accepted'].includes(direct))
+          status = direct === 'expired' ? 'expired' : 'unavailable';
+        else if (scoped && expired(meta)) status = 'expired';
+        else if (
+          requesterRevoked ||
+          (scoped ? !member.scoreConsent : !p.consent?.cloudSync || !p.consent.shareWithFriends)
+        )
+          status = 'sharing_off';
+        else if (direct === 'pending') status = 'awaiting_opponent';
+        else if (expectedDays === 0) status = 'no_data';
+        // A new battle-only grant does not survive removal/recreation of its friendship.
+        if (!status && scoped && !direct && meta.ownerId && sub !== meta.ownerId) {
+          const connected = await friendship(sub, meta.ownerId).then(
+            () => true,
+            (e) => {
+              if (e instanceof HttpError && e.code === 'friend_unavailable') return false;
+              throw e;
+            },
+          );
+          if (!connected) status = 'unavailable';
+        }
+        if (status)
+          return {
+            participant: {
+              userId: p?.userId ?? sub,
+              handle: p?.handle ?? null,
+              status,
+              availableDays: 0,
+              expectedDays,
+            },
+          };
         const [days, goal] = await Promise.all([
           memberDays(sub, meta.startDate, to),
           meta.metric === 'goal_days' ? minutesGoal(sub) : Promise.resolve(null),
         ]);
-        const score = scoreMember(meta.metric, days, goal);
-        return score === null ? null : { userId: p.userId, handle: p.handle, score };
+        const availableDays = days.filter((d) =>
+          meta.metric === 'fewest_views'
+            ? d.comparisonViews !== null
+            : meta.metric === 'goal_days'
+              ? goal !== null &&
+                evaluateDay(d, { metric: 'minutes', dailyLimit: goal }) !== 'unknown'
+              : d.minutes !== null,
+        ).length;
+        // A zero goal-day score is valid only when some measured days were actually evaluated.
+        const score = availableDays ? scoreMember(meta.metric, days, goal) : null;
+        return {
+          participant: {
+            userId: p.userId,
+            handle: p.handle,
+            status: score === null ? 'no_data' : 'ready',
+            availableDays,
+            expectedDays,
+          },
+          ...(score === null
+            ? {}
+            : { entry: { userId: p.userId, handle: p.handle, score, availableDays } }),
+        };
       }),
     );
-    scored.push(...batch.filter((member) => member !== null));
+    for (const result of batch) {
+      participants.push(result.participant);
+      if (result.entry) scored.push(result.entry);
+    }
   }
-  const hidden = subs.length - scored.length;
-  const higherIsBetter = meta.metric === 'goal_days';
-  scored.sort((a, b) => (higherIsBetter ? b.score - a.score : a.score - b.score));
+  // A consent withdrawal/cancel/leave while history was being read must fence the reply.
+  const finalRequester = await readState(memberKey(id, caller.sub));
+  if (!finalRequester) throw Errors.notFound();
+  let stopAll = finalRequester.scoreConsentVersion === 1 && !finalRequester.scoreConsent;
+  let stoppedStatus = 'sharing_off';
+  if (meta.targetIncarnation) {
+    const latest = await getMeta(id),
+      status = await directStatus(latest);
+    if (status !== 'accepted') {
+      stopAll = true;
+      stoppedStatus =
+        status === 'expired'
+          ? 'expired'
+          : status === 'pending'
+            ? 'awaiting_opponent'
+            : 'unavailable';
+    }
+  }
+  const blocked = new Set();
+  for (const member of rows.filter((r) => r.scoreConsentVersion === 1)) {
+    const latest = await readState(memberKey(id, member.sub));
+    const stillActive = await assertActive(member.sub).then(
+      () => true,
+      () => false,
+    );
+    const participant = participants.find((p) => p.userId === prof.get(member.sub)?.userId);
+    let reason = null;
+    if (stopAll) reason = stoppedStatus;
+    else if (!latest || !stillActive) reason = 'unavailable';
+    else if (!latest.scoreConsent) reason = 'sharing_off';
+    else if (expired(meta)) reason = 'expired';
+    if (reason && participant) {
+      participant.status = reason;
+      participant.availableDays = 0;
+      blocked.add(participant.userId);
+    }
+  }
+  for (let i = scored.length - 1; i >= 0; i--)
+    if (blocked.has(scored[i].userId)) scored.splice(i, 1);
+  const higher = meta.metric === 'goal_days';
+  scored.sort((a, b) => (higher ? b.score - a.score : a.score - b.score));
   const entries = [];
   scored.forEach((s, i) => {
-    const prev = entries[i - 1];
-    const rank = prev && scored[i - 1].score === s.score ? prev.rank : i + 1;
+    const previous = entries[i - 1];
+    const rank = previous && scored[i - 1].score === s.score ? previous.rank : i + 1;
+    // Legacy response shape stays compatible; data completeness is always in participants.
     entries.push({
-      rank,
       userId: s.userId,
       handle: s.handle,
       score: s.score,
+      rank,
       scoreSource: 'device',
     });
   });
@@ -336,6 +762,7 @@ export async function getLeaderboard(event, caller) {
     challengeId: id,
     asOf: to,
     entries,
-    hiddenMembers: hidden,
+    hiddenMembers: rows.length - scored.length,
+    participants,
   });
 }

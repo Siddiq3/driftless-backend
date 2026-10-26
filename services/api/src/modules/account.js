@@ -182,8 +182,27 @@ export async function deleteAccountData(incarnation) {
           if (!conditionalFailure(e) || (await readState(member))) throw e;
         }
       } else await cleanupWrite(incarnation, [del(key)]);
+    } else if (row.sk.startsWith('BATTLEINVITE#')) {
+      const meta = { pk: `CHAL#${row.challengeId}`, sk: 'META' };
+      const present = await readState(meta);
+      if (present?.targetIncarnation === incarnation)
+        await cleanupWrite(incarnation, [
+          {
+            Update: {
+              TableName: tableName(),
+              Key: meta,
+              UpdateExpression: 'SET invitationState = :unavailable',
+              ExpressionAttributeValues: { ':unavailable': 'unavailable' },
+            },
+          },
+        ]);
     } else if (row.sk.startsWith('OWNEDCHALLENGE#')) {
       const meta = { pk: `CHAL#${row.challengeId}`, sk: 'META' };
+      const owned = await readState(meta);
+      if (owned?.targetIncarnation)
+        await cleanupWrite(incarnation, [
+          del({ pk: Keys.user(owned.targetIncarnation), sk: `BATTLEINVITE#${row.challengeId}` }),
+        ]);
       try {
         await cleanupWrite(incarnation, [
           {

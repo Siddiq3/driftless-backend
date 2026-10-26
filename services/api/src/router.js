@@ -25,6 +25,8 @@ import {
   postChallenge,
   postJoin,
   postLeave,
+  postInvitation,
+  putScoreConsent,
 } from './modules/challenges.js';
 import { deleteDevice, postDevice } from './modules/devices.js';
 import {
@@ -66,6 +68,8 @@ export const IMPLEMENTED = {
   'POST /v1/challenges': postChallenge,
   'POST /v1/challenges/{id}/join': postJoin,
   'POST /v1/challenges/{id}/leave': postLeave,
+  'POST /v1/challenges/{id}/invitation': postInvitation,
+  'PUT /v1/challenges/{id}/score-consent': putScoreConsent,
   'GET /v1/challenges/{id}/leaderboard': getLeaderboard,
   'POST /v1/devices': postDevice,
   'DELETE /v1/devices/{id}': deleteDevice,
