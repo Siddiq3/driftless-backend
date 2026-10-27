@@ -24,6 +24,33 @@ type Route = {
 /** Single source of truth for the v1 HTTP surface. The API router is tested against this list. */
 export const ROUTES: readonly Route[] = [
   {
+    method: 'post',
+    path: '/v1/battles/invites',
+    summary:
+      'Create a seven-day link granting holders the choice to join ongoing daily battle sharing',
+    request: v1.BattleLinkConsent,
+    response: v1.InviteResponse,
+  },
+  {
+    method: 'get',
+    path: '/v1/battles/invites/{code}',
+    summary: 'Preview a battle invitation without accepting',
+    response: v1.BattleLinkPreview,
+  },
+  {
+    method: 'post',
+    path: '/v1/battles/invites/{code}/accept',
+    summary: 'Accept daily battle sharing and reciprocal friendship; retries are idempotent',
+    request: v1.BattleLinkConsent,
+  },
+  {
+    method: 'get',
+    path: '/v1/battles/daily',
+    summary: 'Daily totals of mutually accepted battle friends from acceptance onward',
+    query: v1.FriendsDailyQuery,
+    response: v1.FriendsDailyResponse,
+  },
+  {
     method: 'get',
     path: '/v1/usage/account/history',
     summary: 'Retained account period summaries with requesting device baseline',

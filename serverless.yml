@@ -67,10 +67,17 @@ functions:
     environment:
       NODE_OPTIONS: --enable-source-maps
       GOOGLE_WEB_CLIENT_ID: ${env:GOOGLE_WEB_CLIENT_ID}
+      PLAY_STORE_URL: ${env:PLAY_STORE_URL, 'https://play.google.com/store/apps/details?id=com.siddiqkolimi.scrollsnooze&hl=en_IN'}
+      APP_STORE_URL: ${env:APP_STORE_URL, ''}
+      ANDROID_SIGNING_SHA256: ${env:ANDROID_SIGNING_SHA256, ''}
+      APPLE_TEAM_ID: ${env:APPLE_TEAM_ID, ''}
       RTDN_AUDIENCE: ${env:RTDN_AUDIENCE, ''}
       RTDN_SERVICE_ACCOUNT: ${env:RTDN_SERVICE_ACCOUNT, ''}
     events:
       - httpApi: { method: GET, path: /health }
+      - httpApi: { method: GET, path: '/join/{code}' }
+      - httpApi: { method: GET, path: '/.well-known/assetlinks.json' }
+      - httpApi: { method: GET, path: '/.well-known/apple-app-site-association' }
       - httpApi: { method: POST, path: /webhooks/play-rtdn }
       - httpApi:
           method: GET

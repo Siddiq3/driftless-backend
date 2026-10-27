@@ -7,7 +7,7 @@ const template = JSON.parse(readFileSync('.serverless/cloudformation-template-up
 const resources = template.Resources;
 const ofType = (type) => Object.values(resources).filter((item) => item.Type === type);
 
-test('every application route requires Google JWT; only health and Play webhook are public', () => {
+test('application routes require JWT; only health, webhook and invitation landing/association routes are public', () => {
   const routes = ofType('AWS::ApiGatewayV2::Route').map((route) => route.Properties);
   const privateRoutes = routes.filter((route) => route.RouteKey.includes('/v1/'));
   assert.equal(privateRoutes.length, 5);
@@ -20,7 +20,13 @@ test('every application route requires Google JWT; only health and Play webhook 
       .filter((route) => !route.AuthorizationType)
       .map((route) => route.RouteKey)
       .sort(),
-    ['GET /health', 'POST /webhooks/play-rtdn'],
+    [
+      'GET /health',
+      'POST /webhooks/play-rtdn',
+      'GET /join/{code}',
+      'GET /.well-known/assetlinks.json',
+      'GET /.well-known/apple-app-site-association',
+    ].sort(),
   );
   const jwt = resources.HttpApiAuthorizerGoogleJwt.Properties.JwtConfiguration;
   assert.equal(jwt.Issuer, 'https://accounts.google.com');

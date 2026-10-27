@@ -21,7 +21,7 @@ export async function friendStatus(a, b) {
 export async function areFriends(a, b) {
   return (await friendStatus(a, b)) === 'accepted';
 }
-async function listFriendItems(sub) {
+export async function listFriendItems(sub) {
   const out = [];
   let start;
   do {
@@ -60,7 +60,7 @@ async function profiles(subs) {
   }
   return map;
 }
-async function toFriends(items) {
+export async function toFriends(items) {
   const prof = await profiles(items.map((i) => i.otherSub));
   return items.flatMap((i) => {
     const p = prof.get(i.otherSub);
@@ -81,7 +81,7 @@ export async function getFriends(_e, caller) {
   return json(200, { friends: await toFriends(await listFriendItems(caller.sub)) });
 }
 /** Compare shared recorded totals; never turn a missing device measurement into zero. */
-async function dailyCount(sub, date) {
+export async function dailyCount(sub, date) {
   const rows = [];
   let start;
   do {
@@ -174,7 +174,7 @@ export async function getFriendsDaily(event, caller) {
     friends: result,
   });
 }
-async function requireOwnHandle(sub) {
+export async function requireOwnHandle(sub) {
   const me = await ddb().send(
     new GetCommand({ TableName: tableName(), Key: { pk: Keys.user(sub), sk: Keys.profile } }),
   );
@@ -229,6 +229,8 @@ async function resolveTarget(body) {
     const it = r.Item;
     if (!it || it.ttl < Date.now() / 1000)
       throw new HttpError(404, 'invite_invalid', 'invite code is invalid or expired');
+    if (it.kind === 'battle')
+      throw Errors.conflict('battle_accept_required', 'Open this battle invite to accept it');
     return { sub: it.sub, viaInvite: true };
   }
   const r = await ddb().send(
