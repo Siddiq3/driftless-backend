@@ -162,3 +162,24 @@ it('escaped names and expired/deleted-owner invites are safe', async () => {
 it('association identities are empty until actual signing identities are configured', async () => {
   expect(bodyOf(await call('GET', '/.well-known/assetlinks.json', null))).toEqual([]);
 });
+
+it('join page hides invite codes and carries the opaque link through Google Play install referrer', async () => {
+  const a = await user(),
+    code = await invite(a);
+  const previous = process.env.PLAY_STORE_URL;
+  process.env.PLAY_STORE_URL =
+    'https://play.google.com/store/apps/details?id=com.siddiqkolimi.scrollsnooze';
+  try {
+    const page = await call('GET', `/join/${code}`, null);
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain(`scrollsnooze://battle-invite?code=${code}`);
+    expect(page.body).toContain(`referrer=battle_invite%3D${code}`);
+    expect(page.body).not.toContain('Copy invitation code');
+    expect(page.body).not.toContain('<code>');
+    expect(page.body).not.toContain('enter this invitation code');
+    expect(page.body).toContain('reopen this invitation after installing');
+  } finally {
+    if (previous === undefined) delete process.env.PLAY_STORE_URL;
+    else process.env.PLAY_STORE_URL = previous;
+  }
+});
