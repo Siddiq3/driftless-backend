@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { localDateOf, addDays } from '@siddiq3/driftless-contracts/domain';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
@@ -72,7 +71,6 @@ it('requires explicit consent; public page contains no account data and download
   expect(page.body).toContain('Study Garage invited you');
   expect(page.body).toContain('Google Play · coming soon');
   expect(page.body).not.toContain(ownerOf(a));
-  writeFileSync('/private/tmp/scrollsnooze-war-invite.html', page.body);
   expect(bodyOf(await call('GET', `/v1/battles/invites/${code}`, b))).toMatchObject({
     code,
     inviterName: 'Study Garage',
