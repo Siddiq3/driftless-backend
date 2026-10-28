@@ -69,7 +69,8 @@ it('requires explicit consent; public page contains no account data and download
   const page = await call('GET', `/join/${code}`, null);
   expect(page.statusCode).toBe(200);
   expect(page.body).toContain('Study Garage invited you');
-  expect(page.body).toContain('Google Play · coming soon');
+  expect(page.body).toContain('Download to battle');
+  expect(page.body).not.toContain('<footer');
   expect(page.body).not.toContain(ownerOf(a));
   expect(bodyOf(await call('GET', `/v1/battles/invites/${code}`, b))).toMatchObject({
     code,
@@ -170,12 +171,13 @@ it('join page hides invite codes and carries the opaque link through Google Play
   try {
     const page = await call('GET', `/join/${code}`, null);
     expect(page.statusCode).toBe(200);
-    expect(page.body).toContain(`scrollsnooze://battle-invite?code=${code}`);
+    expect(page.body).toContain('Download to battle');
     expect(page.body).toContain(`referrer=battle_invite%3D${code}`);
     expect(page.body).not.toContain('Copy invitation code');
     expect(page.body).not.toContain('<code>');
     expect(page.body).not.toContain('enter this invitation code');
-    expect(page.body).toContain('reopen this invitation after installing');
+    expect(page.body).not.toContain('Setup &amp; downloads');
+    expect(page.body).not.toContain('Accepting adds your friend');
   } finally {
     if (previous === undefined) delete process.env.PLAY_STORE_URL;
     else process.env.PLAY_STORE_URL = previous;
