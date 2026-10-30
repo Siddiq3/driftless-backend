@@ -12,6 +12,10 @@ describe('evaluateDay', () => {
   it('kept when under limit with good coverage', () => {
     expect(evaluateDay({ localDate: 'x', views: 20, minutes: 5, coverage: 0.9 }, g)).toBe('kept');
   });
+  it('kept from recorded usage without coverage, unknown without recorded usage', () => {
+    expect(evaluateDay({ localDate: 'x', views: 20, minutes: 5 }, g)).toBe('kept');
+    expect(evaluateDay({ localDate: 'x', views: null, minutes: null }, g)).toBe('unknown');
+  });
   it('unknown when under limit but coverage is low', () => {
     expect(evaluateDay({ localDate: 'x', views: 3, minutes: 5, coverage: 0.5 }, g)).toBe('unknown');
   });

@@ -149,6 +149,17 @@ describe('POST /v1/usage/sync', () => {
     expect(row.personalViews).toBe(90);
     expect(row).not.toHaveProperty('personalAppViews');
   });
+  it('stores a current upload without coverage and clears coverage left by an older client', async () => {
+    const sub = await userWithSync();
+    expect((await sync(sub, [day('2026-10-20', 1)])).statusCode).toBe(200);
+    const current = day('2026-10-20', 2);
+    delete current.coverage;
+    expect((await sync(sub, [current])).statusCode).toBe(200);
+    const [stored] = bodyOf(await history(sub, '2026-10-20', '2026-10-20')).days;
+    expect(stored).toMatchObject({ minutes: 30, rev: 2 });
+    expect(stored).not.toHaveProperty('coverage');
+  });
+
   it('requires cloud-sync consent', async () => {
     const sub = await newAccount();
     await route(event({ path: '/v1/me', sub }));

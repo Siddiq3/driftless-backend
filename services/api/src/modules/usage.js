@@ -30,6 +30,13 @@ function assertNotFuture(localDate, nowMs) {
 async function applyDay(sub, d, now) {
   const key = { pk: Keys.user(sub), sk: Keys.day(d.localDate, d.deviceId) };
   const fields = Object.entries({ ...d, ttl: ttlFor(d.localDate), receivedAt: now });
+  // A current client's upload also clears tracking coverage left by an older version on this row.
+  const removed = [
+    ...(d.personalViews !== undefined && d.personalAppViews === undefined
+      ? ['personalAppViews']
+      : []),
+    ...(d.coverage === undefined ? ['coverage'] : []),
+  ];
   try {
     await activeWrite(
       sub,
@@ -40,14 +47,10 @@ async function applyDay(sub, d, now) {
         UpdateExpression:
           'SET ' +
           fields.map(([name]) => `#${name} = :${name}`).join(', ') +
-          (d.personalViews !== undefined && d.personalAppViews === undefined
-            ? ' REMOVE #personalAppViews'
-            : ''),
+          (removed.length ? ` REMOVE ${removed.map((name) => `#${name}`).join(', ')}` : ''),
         ExpressionAttributeNames: {
           ...Object.fromEntries(fields.map(([name]) => [`#${name}`, name])),
-          ...(d.personalViews !== undefined && d.personalAppViews === undefined
-            ? { '#personalAppViews': 'personalAppViews' }
-            : {}),
+          ...Object.fromEntries(removed.map((name) => [`#${name}`, name])),
         },
         ExpressionAttributeValues: Object.fromEntries(
           fields.map(([name, value]) => [`:${name}`, value]),

@@ -125,8 +125,8 @@ export const DailyAggregate = z
     personalViews: z.int().min(0).max(100_000).nullable().optional(),
     personalAppViews: PersonalAppViews.optional(),
     minutes: z.int().min(0).max(1440).nullable(),
-    /** Fraction of the day during which tracking was healthy. */
-    coverage: z.number().min(0).max(1),
+    /** Legacy clients only. Current clients do not send tracking coverage. */
+    coverage: z.number().min(0).max(1).optional(),
     rev: Revision,
   })
   .refine(

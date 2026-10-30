@@ -4,7 +4,7 @@
  */
 export function comparisonCount(day) {
   if (day.personalViews != null) return day.personalViews;
-  return day.views != null && day.coverage >= 0.8 ? day.views : null;
+  return day.views != null && (day.coverage ?? 1) >= 0.8 ? day.views : null;
 }
 
 /** Personal backup and accounting are cumulative observations of the same device.

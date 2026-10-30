@@ -61,6 +61,13 @@ describe('DailyAggregate', () => {
       ).success,
     ).toBe(false);
   });
+  it('accepts days without coverage and still validates legacy coverage', () => {
+    const current: Record<string, unknown> = { ...day() };
+    delete current.coverage;
+    expect(v1.DailyAggregate.safeParse(current).success).toBe(true);
+    expect(v1.DailyAggregate.safeParse({ ...current, coverage: 0.5 }).success).toBe(true);
+  });
+
   it('accepts a valid Android day', () => {
     expect(v1.DailyAggregate.safeParse(day()).success).toBe(true);
   });

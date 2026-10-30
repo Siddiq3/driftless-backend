@@ -550,7 +550,7 @@ async function memberDays(sub, from, to) {
         comparisonViews:
           cur.comparisonViews === null || count === null ? null : cur.comparisonViews + count,
         views: null,
-        coverage: Math.min(cur.coverage, d.coverage),
+        coverage: Math.min(cur.coverage ?? 1, d.coverage ?? 1),
       });
   }
   return [...byDate.values()];
