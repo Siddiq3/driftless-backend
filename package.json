@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.15.0",
+    "@types/node": "^26.6.5",
     "eslint": "^10.13.0",
     "prettier": "3.8.1",
     "serverless": "3.40.0",
