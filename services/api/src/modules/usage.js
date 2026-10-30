@@ -37,8 +37,18 @@ async function applyDay(sub, d, now) {
         TableName: tableName(),
         Key: key,
         // An older client can update minutes without deleting a newer client's personal backup.
-        UpdateExpression: 'SET ' + fields.map(([name]) => `#${name} = :${name}`).join(', '),
-        ExpressionAttributeNames: Object.fromEntries(fields.map(([name]) => [`#${name}`, name])),
+        UpdateExpression:
+          'SET ' +
+          fields.map(([name]) => `#${name} = :${name}`).join(', ') +
+          (d.personalViews !== undefined && d.personalAppViews === undefined
+            ? ' REMOVE #personalAppViews'
+            : ''),
+        ExpressionAttributeNames: {
+          ...Object.fromEntries(fields.map(([name]) => [`#${name}`, name])),
+          ...(d.personalViews !== undefined && d.personalAppViews === undefined
+            ? { '#personalAppViews': 'personalAppViews' }
+            : {}),
+        },
         ExpressionAttributeValues: Object.fromEntries(
           fields.map(([name, value]) => [`:${name}`, value]),
         ),
@@ -115,6 +125,7 @@ export async function getUsageHistory(event, caller) {
         coverage,
         rev,
         personalViews,
+        personalAppViews,
       } = it;
       days.push({
         localDate,
@@ -127,6 +138,9 @@ export async function getUsageHistory(event, caller) {
         coverage,
         rev,
         ...(includePersonal === 'true' && personalViews !== undefined ? { personalViews } : {}),
+        ...(includePersonal === 'true' && personalAppViews !== undefined
+          ? { personalAppViews }
+          : {}),
       });
     }
     start = page.LastEvaluatedKey;

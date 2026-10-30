@@ -82,6 +82,73 @@ describe('POST /v1/usage/sync', () => {
       (await sync(sub, [day('2026-10-17', 1, { platform: 'ios', personalViews: 73 })])).statusCode,
     ).toBe(400);
   });
+  it('preserves platform history through 80 → 115 → 130 cumulative merges, retries and account isolation', async () => {
+    const a = await userWithSync(),
+      b = await userWithSync();
+    const counts = (ig, yt) => ({ 'com.instagram.android': ig, 'com.google.android.youtube': yt });
+    const date = '2026-10-28';
+    for (const [rev, ig, yt] of [
+      [1, 50, 30],
+      [2, 70, 45],
+      [3, 80, 50],
+    ]) {
+      const row = day(date, rev, { personalViews: ig + yt, personalAppViews: counts(ig, yt) });
+      const key = randomUUID();
+      expect((await sync(a, [row], key)).statusCode).toBe(200);
+      expect((await sync(a, [row], key)).headers['idempotent-replayed']).toBe('true');
+      await sync(a, [row]);
+      const restored = bodyOf(await history(a, date, date)).days;
+      expect(restored).toHaveLength(1);
+      expect(restored[0]).toMatchObject({
+        localDate: date,
+        personalViews: ig + yt,
+        personalAppViews: counts(ig, yt),
+        rev,
+      });
+    }
+    await sync(a, [day(date, 1, { personalViews: 80, personalAppViews: counts(50, 30) })]);
+    expect(bodyOf(await history(a, date, date)).days[0].personalViews).toBe(130);
+    expect(bodyOf(await history(b, date, date)).days).toEqual([]);
+    await sync(a, [
+      day('2026-10-29', 1, {
+        deviceId: randomUUID(),
+        personalViews: 3,
+        personalAppViews: counts(0, 3),
+      }),
+    ]);
+    expect(
+      bodyOf(await history(a, date, '2026-10-29')).days.map((d) => [
+        d.localDate,
+        d.personalAppViews,
+      ]),
+    ).toEqual([
+      [date, counts(80, 50)],
+      ['2026-10-29', counts(0, 3)],
+    ]);
+  });
+  it('rejects inconsistent or unsupported platform attribution and video attribution from iOS', async () => {
+    const sub = await userWithSync();
+    for (const over of [
+      { personalViews: 5, personalAppViews: { 'com.instagram.android': 6 } },
+      { personalViews: 5, personalAppViews: { 'unknown.app': 5 } },
+      { personalViews: 5, personalAppViews: { 'com.instagram.android': -1 } },
+      { platform: 'ios', personalViews: null, personalAppViews: { 'com.instagram.android': 0 } },
+    ])
+      expect((await sync(sub, [day('2026-10-28', 1, over)])).statusCode).toBe(400);
+  });
+  it('does not attach an outdated breakdown to a newer total from a legacy client', async () => {
+    const sub = await userWithSync();
+    await sync(sub, [
+      day('2026-10-28', 1, {
+        personalViews: 80,
+        personalAppViews: { 'com.instagram.android': 50, 'com.google.android.youtube': 30 },
+      }),
+    ]);
+    await sync(sub, [day('2026-10-28', 2, { personalViews: 90 })]);
+    const row = bodyOf(await history(sub, '2026-10-28', '2026-10-28')).days[0];
+    expect(row.personalViews).toBe(90);
+    expect(row).not.toHaveProperty('personalAppViews');
+  });
   it('requires cloud-sync consent', async () => {
     const sub = await newAccount();
     await route(event({ path: '/v1/me', sub }));

@@ -109,6 +109,10 @@ export type GoalsResponse = z.infer<typeof GoalsResponse>;
  * One device's aggregate for one local calendar day.
  * `null` counts mean "not tracked" — never coerce to 0.
  */
+export const PersonalAppViews = z.strictObject({
+  'com.instagram.android': z.int().min(0).max(100_000).nullable().optional(),
+  'com.google.android.youtube': z.int().min(0).max(100_000).nullable().optional(),
+});
 export const DailyAggregate = z
   .strictObject({
     localDate: LocalDate,
@@ -119,6 +123,7 @@ export const DailyAggregate = z
     adViews: z.int().min(0).max(5000).nullable(),
     /** Recorded total for backup/restore and comparisons when separately shared. */
     personalViews: z.int().min(0).max(100_000).nullable().optional(),
+    personalAppViews: PersonalAppViews.optional(),
     minutes: z.int().min(0).max(1440).nullable(),
     /** Fraction of the day during which tracking was healthy. */
     coverage: z.number().min(0).max(1),
@@ -127,11 +132,23 @@ export const DailyAggregate = z
   .refine(
     (a) =>
       a.platform === 'android' ||
-      (a.views === null && a.adViews === null && a.personalViews == null),
+      (a.views === null &&
+        a.adViews === null &&
+        a.personalViews == null &&
+        a.personalAppViews == null),
     {
       message: 'iOS aggregates cannot carry video counts',
       path: ['views'],
     },
+  )
+  .refine(
+    (a) =>
+      !a.personalAppViews ||
+      a.personalViews == null ||
+      Object.values(a.personalAppViews).some((n) => n === null) ||
+      Object.values(a.personalAppViews).reduce<number>((sum, n) => sum + (n ?? 0), 0) ===
+        a.personalViews,
+    { message: 'Platform counts must equal personalViews', path: ['personalAppViews'] },
   );
 export type DailyAggregate = z.infer<typeof DailyAggregate>;
 
