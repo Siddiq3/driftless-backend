@@ -248,11 +248,16 @@ export async function postChallenge(event, caller) {
     const pair = await readState(pairKey(caller.sub, target));
     if (pair) {
       const existing = await readState(metaKey(pair.challengeId));
-      if (existing && ['pending', 'accepted'].includes(await directStatus(existing)))
+      if (existing && ['pending', 'accepted'].includes(await directStatus(existing))) {
+        // A concurrent copy of this operation may have committed after our first
+        // receipt read. Replay it before treating its pair as a different battle.
+        const committed = await replay();
+        if (committed) return committed;
         throw Errors.conflict(
           'battle_exists',
           'A battle with this friend is already active. Open Your battles.',
         );
+      }
     }
     items.push(
       put(

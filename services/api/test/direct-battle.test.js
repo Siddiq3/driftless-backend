@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { UpdateCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { v1 } from '@siddiq3/driftless-contracts';
+import * as lifecycle from '../src/lib/lifecycle.js';
 import { route } from '../src/router.js';
 import { ddb, tableName } from '../src/lib/ddb.js';
 import { bodyOf, event, newAccount, ownerOf } from './helpers.js';
@@ -145,6 +146,21 @@ describe('direct challenge invitations', () => {
     ).toBe(409);
     expect(bodyOf(await call(b, 'GET', '/v1/challenges')).invitations).toHaveLength(1);
     expect((await call(a, 'POST', '/v1/challenges', input(b))).statusCode).toBe(409);
+  });
+  it('replays when a concurrent operation commits between the initial receipt and pair reads', async () => {
+    const body = input(b);
+    const first = await call(a, 'POST', '/v1/challenges', body);
+    expect(first.statusCode).toBe(200);
+    const read = lifecycle.readState;
+    let receiptReads = 0;
+    vi.spyOn(lifecycle, 'readState').mockImplementation(async (key) => {
+      if (key.sk === `BATTLEOP#${body.operationId}` && receiptReads++ === 0) return null;
+      return read(key);
+    });
+    const replay = await call(a, 'POST', '/v1/challenges', body);
+    expect(replay.statusCode).toBe(200);
+    expect(bodyOf(replay).challengeId).toBe(bodyOf(first).challengeId);
+    expect(receiptReads).toBe(2);
   });
   it('declines or cancels idempotently and cannot accept a terminal invitation', async () => {
     const first = await start(a, b);
