@@ -4,7 +4,9 @@ import { v1 } from '@siddiq3/driftless-contracts';
 import { addDays, localDateOf } from '@siddiq3/driftless-contracts/domain';
 import { scoreMember } from '../src/modules/challenges.js';
 import { route } from '../src/router.js';
-import { bodyOf, event, newAccount } from './helpers.js';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
+import { ddb, Keys, tableName } from '../src/lib/ddb.js';
+import { bodyOf, event, newAccount, ownerOf } from './helpers.js';
 const call = (method, path, sub, body, headers) =>
   route(event({ method, path, sub, body, headers }));
 const today = localDateOf(Date.now(), 'UTC');
@@ -507,5 +509,84 @@ describe('devices', () => {
     ).toBe('too_many_devices');
     expect((await call('DELETE', `/v1/devices/${ids[0]}`, b.sub)).statusCode).toBe(404);
     expect((await call('DELETE', `/v1/devices/${ids[0]}`, a.sub)).statusCode).toBe(200);
+  });
+});
+
+describe('daily board reconciles personal history and account observations per device', () => {
+  it('shows 50 for the same device with personal 40 and account 50, without adding the two copies', async () => {
+    const a = await user(),
+      b = await user();
+    await befriend(a, b);
+    const id = randomUUID();
+    const original = {
+      localDate: today,
+      tz: 'UTC',
+      platform: 'android',
+      deviceId: id,
+      personalViews: 40,
+      views: null,
+      adViews: null,
+      minutes: null,
+      coverage: 1,
+      rev: 1,
+    };
+    expect(
+      (
+        await call(
+          'POST',
+          '/v1/usage/sync',
+          a.sub,
+          { days: [original] },
+          { 'idempotency-key': randomUUID() },
+        )
+      ).statusCode,
+    ).toBe(200);
+    const accounting = {
+      pk: Keys.user(ownerOf(a.sub)),
+      sk: `ACCOUNTUSAGE#DAY#${today}`,
+      ttl: Math.floor(Date.now() / 1000) + 86400,
+      devices: { [id]: { used: { views: 50 }, granted: { views: 100 } } },
+    };
+    await ddb().send(new PutCommand({ TableName: tableName(), Item: accounting }));
+    const read = async (sub) =>
+      bodyOf(await route(event({ path: '/v1/friends/daily', sub, query: { date: today } })));
+    expect((await read(a.sub)).self.views).toBe(50);
+    expect((await read(b.sub)).friends[0].daily.views).toBe(50);
+    // Other devices add; reserved allowance does not count as watched videos.
+    accounting.devices[randomUUID()] = { used: { views: 5 }, granted: { views: 100 } };
+    await ddb().send(new PutCommand({ TableName: tableName(), Item: accounting }));
+    expect((await read(a.sub)).self.views).toBe(55);
+    expect((await read(a.sub)).self.views).toBe(55);
+    // A newer personal total can contain pre-sign-in activity and must win for its device.
+    expect(
+      (
+        await call(
+          'POST',
+          '/v1/usage/sync',
+          a.sub,
+          { days: [{ ...original, personalViews: 80, rev: 2 }] },
+          { 'idempotency-key': randomUUID() },
+        )
+      ).statusCode,
+    ).toBe(200);
+    expect((await read(a.sub)).self.views).toBe(85);
+    // Expired account observations cannot affect the board.
+    accounting.ttl = 1;
+    await ddb().send(new PutCommand({ TableName: tableName(), Item: accounting }));
+    expect((await read(a.sub)).self.views).toBe(80);
+    // Revoking friend sharing still hides all account measurements.
+    const me = bodyOf(await call('GET', '/v1/me', a.sub));
+    expect(
+      (
+        await call(
+          'PATCH',
+          '/v1/me',
+          a.sub,
+          { consent: { shareWithFriends: false } },
+          { 'if-match': String(me.profile.rev) },
+        )
+      ).statusCode,
+    ).toBe(200);
+    expect((await read(b.sub)).friends[0].daily.views).toBeNull();
   });
 });

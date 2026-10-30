@@ -8,7 +8,7 @@ import { Errors, HttpError, json, parseBody, validate } from '../lib/http.js';
 import { rateLimit } from '../lib/rate.js';
 import { loadProfile } from './me.js';
 import { batchGet } from '../lib/batch.js';
-import { comparisonCount } from '../lib/comparison-count.js';
+import { reconciledComparisonCounts } from '../lib/comparison-count.js';
 export const MAX_FRIENDS = 200;
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 const INVITE_TTL_SEC = 7 * 86_400;
@@ -102,7 +102,19 @@ export async function dailyCount(sub, date) {
     start = page.LastEvaluatedKey;
   } while (start);
   const live = rows.filter((row) => row.ttl > Date.now() / 1000);
-  const counts = live.map(comparisonCount);
+  const accounting = (
+    await ddb().send(
+      new GetCommand({
+        TableName: tableName(),
+        Key: { pk: Keys.user(sub), sk: `ACCOUNTUSAGE#DAY#${date}` },
+        ConsistentRead: true,
+      }),
+    )
+  ).Item;
+  const counts = reconciledComparisonCounts(
+    live,
+    accounting?.ttl > Date.now() / 1000 ? accounting.devices : {},
+  );
   if (!counts.length || counts.some((count) => count === null))
     return { status: 'unavailable', views: null, updatedAt: null };
   return {
