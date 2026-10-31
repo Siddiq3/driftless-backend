@@ -1,0 +1,11 @@
+install exit=0 secs=5
+build exit=0 secs=4
+format exit=0 secs=2
+lint exit=0 secs=3
+typecheck exit=0 secs=3
+test exit=0 secs=34
+deployment-checks exit=0 secs=1
+pack exit=0 secs=0
+serverless-package exit=0 secs=12
+template-checks exit=0 secs=1
+gitleaks exit=0 secs=1

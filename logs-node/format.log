@@ -1,0 +1,6 @@
+
+> driftless-backend@ format:check /home/runner/work/driftless-backend/driftless-backend
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!

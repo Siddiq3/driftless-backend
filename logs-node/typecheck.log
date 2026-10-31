@@ -1,0 +1,24 @@
+
+   • Packages in scope: @driftless/api, @siddiq3/driftless-contracts
+   • Running typecheck in 2 packages
+   • Remote caching disabled
+
+::group::@siddiq3/driftless-contracts:build
+cache hit, replaying logs bf94dfe5a38a8986
+
+> @siddiq3/driftless-contracts@0.5.0 build /home/runner/work/driftless-backend/driftless-backend/packages/contracts
+> tsc -p tsconfig.json
+
+::endgroup::
+::group::@siddiq3/driftless-contracts:typecheck
+cache miss, executing 70523f95121bfccd
+
+> @siddiq3/driftless-contracts@0.5.0 typecheck /home/runner/work/driftless-backend/driftless-backend/packages/contracts
+> tsc -p tsconfig.test.json
+
+::endgroup::
+
+ Tasks:    2 successful, 2 total
+Cached:    1 cached, 2 total
+  Time:    2.677s 
+
