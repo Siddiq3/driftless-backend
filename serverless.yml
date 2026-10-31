@@ -79,6 +79,9 @@ functions:
       - httpApi: { method: GET, path: '/.well-known/assetlinks.json' }
       - httpApi: { method: GET, path: '/.well-known/apple-app-site-association' }
       - httpApi: { method: POST, path: /webhooks/play-rtdn }
+      # Browser permission checks for the public deletion page. They return no data.
+      - httpApi: { method: OPTIONS, path: /v1/account }
+      - httpApi: { method: OPTIONS, path: /v1/account/delete }
       - httpApi:
           method: GET
           path: /v1/{proxy+}

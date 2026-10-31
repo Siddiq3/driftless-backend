@@ -60,6 +60,22 @@ describe('account deletion', () => {
     expect((await call('POST', '/v1/account/delete', a.sub)).statusCode).toBe(200);
     expect(await rowsFor(a.sub)).toEqual([]);
   });
+  it('one user cannot delete another user by sending their account ID', async () => {
+    const a = await user();
+    const b = await user();
+    const { incarnation } = bodyOf(await call('GET', '/v1/account', b.sub));
+    const attempt = await route(
+      event({
+        method: 'POST',
+        path: '/v1/account/delete',
+        sub: a.sub,
+        headers: { 'x-account-incarnation': incarnation },
+      }),
+    );
+    expect(attempt.statusCode).toBe(409);
+    expect((await rowsFor(b.sub)).length).toBeGreaterThan(0);
+    expect(bodyOf(await call('GET', '/v1/account', b.sub)).state).toBe('active');
+  });
   it('requires a recent sign-in', async () => {
     const a = await user();
     const old = Math.floor(Date.now() / 1000) - 3600;

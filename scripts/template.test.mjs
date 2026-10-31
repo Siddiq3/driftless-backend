@@ -7,9 +7,23 @@ const template = JSON.parse(readFileSync('.serverless/cloudformation-template-up
 const resources = template.Resources;
 const ofType = (type) => Object.values(resources).filter((item) => item.Type === type);
 
+test('browser access is limited to the deletion page routes, not the whole API', () => {
+  const api = Object.values(resources).find((r) => r.Type === 'AWS::ApiGatewayV2::Api');
+  assert.equal(api.Properties.CorsConfiguration, undefined);
+  const options = ofType('AWS::ApiGatewayV2::Route')
+    .map((route) => route.Properties)
+    .filter((route) => route.RouteKey.startsWith('OPTIONS '));
+  assert.deepEqual(options.map((route) => route.RouteKey).sort(), [
+    'OPTIONS /v1/account',
+    'OPTIONS /v1/account/delete',
+  ]);
+});
+
 test('application routes require JWT; only health, webhook and invitation landing/association routes are public', () => {
   const routes = ofType('AWS::ApiGatewayV2::Route').map((route) => route.Properties);
-  const privateRoutes = routes.filter((route) => route.RouteKey.includes('/v1/'));
+  const privateRoutes = routes.filter(
+    (route) => route.RouteKey.includes('/v1/') && !route.RouteKey.startsWith('OPTIONS '),
+  );
   assert.equal(privateRoutes.length, 5);
   for (const route of privateRoutes) {
     assert.equal(route.AuthorizationType, 'JWT');
@@ -22,6 +36,8 @@ test('application routes require JWT; only health, webhook and invitation landin
       .sort(),
     [
       'GET /health',
+      'OPTIONS /v1/account',
+      'OPTIONS /v1/account/delete',
       'POST /webhooks/play-rtdn',
       'GET /join/{code}',
       'GET /.well-known/assetlinks.json',

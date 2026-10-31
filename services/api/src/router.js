@@ -1,3 +1,4 @@
+import { isPreflight, preflight, withBrowserAccess } from './lib/cors.js';
 import {
   postBattleInvite,
   getBattleInvite,
@@ -115,6 +116,10 @@ function matchPattern(method, event) {
 }
 export async function route(event) {
   const method = event.requestContext?.http?.method ?? 'GET';
+  if (isPreflight(event, method)) return preflight(event);
+  return withBrowserAccess(event, method, await handle(event, method));
+}
+async function handle(event, method) {
   const key = `${method} ${event.rawPath}`;
   const started = Date.now();
   let label = 'unmatched';
