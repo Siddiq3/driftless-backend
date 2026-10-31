@@ -128,7 +128,7 @@ async function summary(m, caller) {
       base.invitationState === 'unavailable'
         ? null
         : await readState({ pk: Keys.user(m.ownerId), sk: Keys.profile });
-    base.ownerName = owner?.displayName ?? owner?.handle ?? null;
+    base.ownerName = owner?.displayName ?? null;
   }
   return base;
 }

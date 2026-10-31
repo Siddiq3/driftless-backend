@@ -21,6 +21,8 @@ const inviteKey = (code) => ({ pk: `INVITE#${code}`, sk: 'INVITE' });
 const friendKey = (a, b) => ({ pk: Keys.user(a), sk: `FRIEND#${b}` });
 const receiptKey = (sub, code) => ({ pk: Keys.user(sub), sk: `BATTLEJOIN#${code}` });
 const put = (Item, extra = {}) => ({ Put: { TableName: tableName(), Item, ...extra } });
+const inviteUsed = () =>
+  Errors.conflict('invite_used', 'This invitation has already been used. Ask for a new one.');
 export async function battleInvite(code) {
   if (!codeSchema.safeParse(code).success) throw Errors.notFound();
   const invite = await readState(inviteKey(code));
@@ -61,11 +63,17 @@ export async function postBattleInvite(event, caller) {
 }
 export async function getBattleInvite(event, caller) {
   const code = event.pathParameters?.code;
-  const { invite, profile } = await battleInvite(code);
+  const { invite } = await battleInvite(code);
+  // Only the person who claimed the link, while still connected, can re-read it after a lost reply.
+  if (
+    invite.consumedBy &&
+    (invite.consumedBy !== caller.sub ||
+      !granted(await readState(friendKey(caller.sub, invite.sub))))
+  )
+    throw inviteUsed();
+  // Inviter details stay out of this response: names are visible only after acceptance.
   return json(200, {
     code,
-    inviterName: profile.displayName || profile.handle,
-    inviterUserId: profile.userId,
     isSelf: invite.sub === caller.sub,
     expiresAt: new Date(invite.ttl * 1000).toISOString(),
   });
@@ -84,14 +92,14 @@ export async function acceptBattleInvite(event, caller) {
     readState(friendKey(other, caller.sub)),
     readState(receiptKey(caller.sub, code)),
   ]);
+  // A lost reply can retry safely. It creates nothing and does not use up the link.
   if (granted(mine) && granted(theirs)) return json(200, { ok: true });
-  if (receipt)
-    throw Errors.conflict('invite_used', 'This battle was removed. Ask for a new invite.');
+  if (receipt || invite.consumedBy) throw inviteUsed();
   if (
     (!mine && (await listFriendItems(caller.sub)).length >= MAX_FRIENDS) ||
     (!theirs && (await listFriendItems(other)).length >= MAX_FRIENDS)
   )
-    throw Errors.conflict('too_many_friends', 'Your battle circle is full');
+    throw Errors.conflict('too_many_friends', 'This friends list is full');
   const now = new Date().toISOString();
   const sinceDate = localDateOf(Date.now(), (await loadProfile(other)).tz);
   const friend = (a, b, previous) =>
@@ -118,17 +126,21 @@ export async function acceptBattleInvite(event, caller) {
       new TransactWriteCommand({
         TransactItems: [
           {
-            ConditionCheck: {
+            // Single use: only one transaction can ever claim this row.
+            Update: {
               TableName: tableName(),
               Key: inviteKey(code),
+              UpdateExpression: 'SET consumedBy = :me, consumedAt = :at',
               ConditionExpression:
-                '#kind = :kind AND #owner = :owner AND #ttl > :now AND scoreConsentVersion = :v',
+                '#kind = :kind AND #owner = :owner AND #ttl > :now AND scoreConsentVersion = :v AND attribute_not_exists(consumedBy)',
               ExpressionAttributeNames: { '#kind': 'kind', '#owner': 'sub', '#ttl': 'ttl' },
               ExpressionAttributeValues: {
                 ':kind': 'battle',
                 ':owner': other,
                 ':now': Math.floor(Date.now() / 1000),
                 ':v': 1,
+                ':me': caller.sub,
+                ':at': now,
               },
             },
           },
@@ -147,8 +159,10 @@ export async function acceptBattleInvite(event, caller) {
       readState(friendKey(caller.sub, other)),
       readState(friendKey(other, caller.sub)),
     ]);
-    if (!granted(left) || !granted(right))
+    if (!granted(left) || !granted(right)) {
+      if ((await readState(inviteKey(code)))?.consumedBy) throw inviteUsed();
       throw Errors.conflict('battle_changed', 'The invitation changed. Please try again.');
+    }
   }
   return json(200, { ok: true });
 }

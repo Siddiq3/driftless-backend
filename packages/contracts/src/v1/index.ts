@@ -222,8 +222,6 @@ export const BattleLinkConsent = z.strictObject({ scoreConsent: z.literal(true) 
 export const BattleLinkCode = z.string().regex(/^[A-HJ-NP-Z2-9]{10}$/);
 export const BattleLinkPreview = z.object({
   code: BattleLinkCode,
-  inviterName: z.string(),
-  inviterUserId: z.string(),
   isSelf: z.boolean(),
   expiresAt: z.iso.datetime(),
 });

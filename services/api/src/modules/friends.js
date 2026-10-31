@@ -69,7 +69,8 @@ export async function toFriends(items) {
           {
             userId: p.userId,
             handle: p.handle,
-            displayName: p.displayName,
+            // A pending request has not been accepted, so neither side gets a name yet.
+            displayName: i.status === 'accepted' ? p.displayName : null,
             status: i.status,
             since: i.since,
           },
@@ -120,6 +121,8 @@ export async function dailyCount(sub, date) {
   return {
     status: 'eligible',
     views: counts.reduce((sum, count) => sum + count, 0),
+    // Recorded totals can include apps that have not passed the accuracy gate.
+    experimental: live.some((row) => row.personalViews != null && row.views !== row.personalViews),
     updatedAt: live
       .map((row) => row.receivedAt)
       .sort()

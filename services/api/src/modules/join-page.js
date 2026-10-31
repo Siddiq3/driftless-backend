@@ -56,11 +56,10 @@ export function associationFile(path) {
   });
 }
 export async function joinPage(code) {
-  let name = 'Your friend',
-    valid = true;
+  let valid = true;
   try {
-    const { profile } = await battleInvite(code);
-    name = profile.displayName || profile.handle;
+    const { invite } = await battleInvite(code);
+    if (invite.consumedBy) valid = false;
   } catch (e) {
     if (!(e instanceof HttpError)) throw e;
     valid = false;
@@ -83,7 +82,7 @@ export async function joinPage(code) {
       'x-frame-options': 'DENY',
       'content-security-policy': `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src data:; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
     },
-    body: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#743900"><title>Join a ScrollSnooze battle</title><meta name="description" content="A little friendly competition. Join your friend on ScrollSnooze and see who scrolls less."><style nonce="${nonce}">
+    body: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#743900"><title>Join the ScrollSnooze Friends Leaderboard</title><meta name="description" content="A little friendly competition. Join your friend on ScrollSnooze and see who scrolls less."><style nonce="${nonce}">
 ${componentStyles}
 @font-face{font-family:Lilita;src:url("${displayFont}") format("truetype");font-weight:400;font-display:swap}
 @font-face{font-family:Cabinet;src:url("${bodyFont}") format("woff2");font-weight:800;font-display:swap}
@@ -102,8 +101,8 @@ h1{font-size:clamp(22px,5.6vw,34px);line-height:1.38;letter-spacing:-.015em;font
 @media(max-height:600px){h1{margin-top:30px}.stage{margin-top:35px}.cta{padding-top:40px}main{padding-bottom:22px}}
 @media(prefers-reduced-motion:reduce){.primary.btn{transition:none}}
 </style></head><body><main${valid ? '' : ' class="unavailable"'}>
-<a class="brand" href="https://scrollsnooze.vercel.app" aria-label="ScrollSnooze home">ScrollSnooze</a><h1>${valid ? `${esc(name)} invited you to a<br>Scroll Battle` : 'This invitation is no longer available'}</h1>
-${valid ? `<section class="stage" aria-label="Your Scroll Battle"><div class="bubble">Let’s see who scrolls less!&nbsp; 👊</div><div class="duel"><figure class="person"><div class="avatar avatar-placeholder"><div><span aria-hidden="true">${esc([...name][0]?.toUpperCase() || '?')}</span></div></div><figcaption>${esc(name)}</figcaption></figure><img class="versus" src="${versusIcon}" alt="versus"><figure class="person"><div class="avatar you"><div><img src="${guestIcon}" alt=""></div></div><figcaption>You</figcaption></figure></div></section><div class="cta"><a id="battle-action" class="btn primary" href="${esc(destination)}" data-app-url="${esc(app)}" data-android-url="${esc(androidIntent)}" data-play-url="${esc(play?.href ?? '')}" data-apple-url="${esc(apple?.href ?? '')}">Download to battle</a><p id="download-status" class="download-status" role="status" hidden></p></div>` : '<p class="recovery">It may have expired or been removed. Ask your friend to share a new link.</p>'}
+<a class="brand" href="https://scrollsnooze.vercel.app" aria-label="ScrollSnooze home">ScrollSnooze</a><h1>${valid ? `A friend invited you to the<br>Friends Leaderboard` : 'This invitation is no longer available'}</h1>
+${valid ? `<section class="stage" aria-label="Your invitation"><div class="bubble">Let’s see who scrolls less!&nbsp; 👊</div><div class="duel"><figure class="person"><div class="avatar avatar-placeholder"><div><span aria-hidden="true">?</span></div></div><figcaption>A friend</figcaption></figure><img class="versus" src="${versusIcon}" alt=""><figure class="person"><div class="avatar you"><div><img src="${guestIcon}" alt=""></div></div><figcaption>You</figcaption></figure></div></section><div class="cta"><a id="battle-action" class="btn primary" href="${esc(destination)}" data-app-url="${esc(app)}" data-android-url="${esc(androidIntent)}" data-play-url="${esc(play?.href ?? '')}" data-apple-url="${esc(apple?.href ?? '')}">Download to join</a><p id="download-status" class="download-status" role="status" hidden></p></div>` : '<p class="recovery">It may have expired or been removed. Ask your friend to share a new link.</p>'}
 </main>${valid ? `<script nonce="${nonce}">(${installInviteNavigation.toString()})();</script>` : ''}</body></html>`,
   };
 }
